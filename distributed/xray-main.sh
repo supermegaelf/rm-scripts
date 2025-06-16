@@ -43,16 +43,48 @@ fi
 # Load variables
 source /opt/remnawave/install_vars.sh
 
-# Load admin token
-if [[ ! -f "/opt/remnawave/admin_token.txt" ]]; then
-    print_error "Admin token not found. Please run deployment script first."
-    exit 1
+# Load or create admin token
+if [[ ! -f "/opt/remnawave/admin_token.txt" ]] || [[ ! -s "/opt/remnawave/admin_token.txt" ]]; then
+    echo "Admin token not found, creating new token..."
+    
+    # Try to get token via login
+    TOKEN_RESPONSE=$(docker exec remnawave curl -s -X POST "http://localhost:3000/api/auth/login" \
+        -H "Content-Type: application/json" \
+        -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
+    
+    NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.response.accessToken')
+    
+    if [ -n "$NEW_TOKEN" ] && [ "$NEW_TOKEN" != "null" ]; then
+        echo "$NEW_TOKEN" > /opt/remnawave/admin_token.txt
+        chmod 600 /opt/remnawave/admin_token.txt
+        print_success "Token created via login"
+    else
+        # Try register if login failed
+        echo "Login failed, trying register..."
+        REGISTER_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/register" \
+            -H "Content-Type: application/json" \
+            -H "Host: $PANEL_DOMAIN" \
+            -H "X-Forwarded-For: 127.0.0.1" \
+            -H "X-Forwarded-Proto: https" \
+            -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
+        
+        REG_TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.response.accessToken')
+        
+        if [ -n "$REG_TOKEN" ] && [ "$REG_TOKEN" != "null" ]; then
+            echo "$REG_TOKEN" > /opt/remnawave/admin_token.txt
+            chmod 600 /opt/remnawave/admin_token.txt
+            print_success "Token created via register"
+        else
+            print_error "Failed to create token via both login and register"
+            exit 1
+        fi
+    fi
 fi
 
 TOKEN=$(cat /opt/remnawave/admin_token.txt)
 
 if [ -z "$TOKEN" ]; then
-    print_error "Token not found! Please run deployment script first."
+    print_error "Token is empty after creation!"
     exit 1
 fi
 
