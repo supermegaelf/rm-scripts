@@ -177,8 +177,17 @@ fi
 print_success "Administrator registered successfully!"
 echo "Token received: ${TOKEN:0:20}..."
 
+# Save token to file
 echo "$TOKEN" > /opt/remnawave/admin_token.txt
 chmod 600 /opt/remnawave/admin_token.txt
+
+# Verify token was saved
+if [[ -f "/opt/remnawave/admin_token.txt" ]] && [[ -s "/opt/remnawave/admin_token.txt" ]]; then
+    print_success "Admin token saved successfully"
+else
+    print_error "Failed to save admin token"
+    exit 1
+fi
 
 # Get public key
 echo "Getting public key for nodes..."
