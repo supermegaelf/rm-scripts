@@ -1,18 +1,4 @@
-# Create .env-node file only if there's a node container
-if [ "$HAS_NODE_CONTAINER" = true ]; then
-    echo "Creating .env-node file for local node..."
-    cat > /opt/remnawave/.env-node <<EOL
-### APP ###
-APP_PORT=2222
-
-### XRAY ###
-SSL_CERT="$PUBLIC_KEY"
-EOL
-    chmod 600 /opt/remnawave/.env-node
-    print_success ".env-node file created for local node"
-else
-    print_warning "No node container detected - .env-node file not needed"
-fi#!/bin/bash
+#!/bin/bash
 
 set -e  # Exit on any error
 
@@ -56,8 +42,6 @@ fi
 
 # Load variables
 source /opt/remnawave/install_vars.sh
-
-
 
 # Load or create admin token
 if [[ ! -f "/opt/remnawave/admin_token.txt" ]] || [[ ! -s "/opt/remnawave/admin_token.txt" ]]; then
@@ -350,22 +334,6 @@ else
     exit 1
 fi
 
-# Create .env-node file only if there's a node container
-if [ "$HAS_NODE_CONTAINER" = true ]; then
-    echo "Creating .env-node file for local node..."
-    cat > /opt/remnawave/.env-node <<EOL
-### APP ###
-APP_PORT=2222
-
-### XRAY ###
-SSL_CERT="$PUBLIC_KEY"
-EOL
-    chmod 600 /opt/remnawave/.env-node
-    print_success ".env-node file created for local node"
-else
-    print_warning "No node container detected - .env-node file not needed"
-fi
-
 # Save node configuration
 cat > /opt/remnawave/node_info.txt <<EOL
 ========================================
@@ -394,7 +362,7 @@ Reality Keys:
 - Short ID: $SHORT_ID
 
 SSL Certificate for Node:
-SSL_CERT="$PUBLIC_KEY" (for external node installation)
+SSL_CERT="$PUBLIC_KEY"
 
 ========================================
 EOL
