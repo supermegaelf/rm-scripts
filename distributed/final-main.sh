@@ -98,10 +98,14 @@ INBOUNDS_RESPONSE=$(curl -s -X GET "http://127.0.0.1:3000/api/inbounds" \
 
 INBOUND_UUID=$(echo "$INBOUNDS_RESPONSE" | jq -r '.response[0].uuid')
 
+# Calculate expiration date (30 days from now)
+EXPIRE_AT=$(date -d "+30 days" --utc +"%Y-%m-%dT%H:%M:%S.000Z")
+
 TEST_USER_DATA=$(cat <<EOF
 {
     "username": "testuser",
     "role": "USER",
+    "expireAt": "$EXPIRE_AT",
     "userLimits": {
         "maxActiveInbounds": 1,
         "lifetimeDays": 30,
@@ -231,7 +235,6 @@ docker compose down
 # Create backup
 tar -czf "$BACKUP_FILE" \
     .env \
-    .env-node \
     docker-compose.yml \
     nginx.conf \
     credentials.txt \
@@ -277,6 +280,7 @@ print_status() {
 }
 
 echo -e "\n--- Containers ---"
+cd /opt/remnawave
 docker compose ps --format "table {{.Service}}\t{{.Status}}"
 
 echo -e "\n--- Network Ports ---"
@@ -346,7 +350,6 @@ chmod 600 /opt/remnawave/node_info.txt
 
 cat > /opt/remnawave/.gitignore <<EOL
 .env
-.env-node
 credentials.txt
 admin_token.txt
 *.log
