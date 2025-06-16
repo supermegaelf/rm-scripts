@@ -144,97 +144,68 @@ done
 echo
 print_success "Redis is ready!"
 
-# Give services more time to initialize
+# Give services time to fully initialize
 print_info "Waiting for services to fully initialize..."
 sleep 10
 
 # Check if backend port is open
 print_warning "Checking backend service port..."
-if nc -z 127.0.0.1 3000 2>/dev/null; then
-    print_success "Backend port 3000 is open"
-else
-    print_error "Backend port 3000 is not accessible"
+max_attempts=30
+attempt=1
+while [ $attempt -le $max_attempts ]; do
+    if nc -z 127.0.0.1 3000 2>/dev/null; then
+        print_success "Backend port 3000 is open"
+        break
+    fi
+    echo "Waiting for backend port... attempt $attempt of $max_attempts"
+    sleep 2
+    ((attempt++))
+done
+
+if [ $attempt -gt $max_attempts ]; then
+    print_error "Backend port 3000 never became available"
     docker compose logs remnawave --tail=50
     exit 1
 fi
 
-# Try different approach - check health endpoint first
-print_warning "Checking backend health..."
-max_attempts=20
-attempt=1
-backend_ready=false
-
-while [ $attempt -le $max_attempts ]; do
-    # First check if we can connect to the service at all
-    if curl -s -f -m 5 "http://127.0.0.1:3000/" > /dev/null 2>&1; then
-        print_success "Backend is responding!"
-        backend_ready=true
-        break
-    fi
-    
-    echo "Backend check attempt $attempt of $max_attempts..."
-    sleep 3
-    ((attempt++))
-done
-
-if [ "$backend_ready" = false ]; then
-    print_error "Backend service is not responding"
-    print_info "Checking container logs..."
-    docker compose logs remnawave --tail=100
-    exit 1
-fi
-
-# Wait a bit more for all endpoints to be ready
+# Additional wait for API to be fully ready
 sleep 5
 
-# Register administrator (handle case where admin already exists)
+# Register administrator with proper headers
 print_warning "Registering administrator..."
-
-# Debug: Check what the API returns
-print_info "Testing API endpoint..."
-API_TEST=$(curl -s -X GET "http://127.0.0.1:3000/api/auth/register" \
-    -H "Host: $PANEL_DOMAIN" \
-    -H "X-Forwarded-For: 127.0.0.1" \
-    -H "X-Forwarded-Proto: https" 2>&1)
-
-print_info "API test response: ${API_TEST:0:100}..."
 
 REGISTER_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/register" \
     -H "Content-Type: application/json" \
     -H "Host: $PANEL_DOMAIN" \
     -H "X-Forwarded-For: 127.0.0.1" \
     -H "X-Forwarded-Proto: https" \
-    -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}" 2>&1)
-
-print_info "Register response: ${REGISTER_RESPONSE:0:200}..."
+    -H "X-Real-IP: 127.0.0.1" \
+    -H "X-Forwarded-Host: $PANEL_DOMAIN" \
+    -H "X-Forwarded-Port: 443" \
+    -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
 
 TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.response.accessToken // empty' 2>/dev/null || echo "")
 
 # If registration failed, try to login
 if [ -z "$TOKEN" ]; then
-    print_warning "Registration failed, trying to login..."
+    print_warning "Registration may have failed (user might exist), trying to login..."
     
     LOGIN_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/login" \
         -H "Content-Type: application/json" \
         -H "Host: $PANEL_DOMAIN" \
         -H "X-Forwarded-For: 127.0.0.1" \
         -H "X-Forwarded-Proto: https" \
-        -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}" 2>&1)
-    
-    print_info "Login response: ${LOGIN_RESPONSE:0:200}..."
+        -H "X-Real-IP: 127.0.0.1" \
+        -H "X-Forwarded-Host: $PANEL_DOMAIN" \
+        -H "X-Forwarded-Port: 443" \
+        -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
     
     TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.response.accessToken // empty' 2>/dev/null || echo "")
     
     if [ -z "$TOKEN" ]; then
         print_error "Both registration and login failed!"
-        
-        # Additional debugging
-        print_info "Checking if API is accessible directly..."
-        curl -v "http://127.0.0.1:3000/api/auth/register" 2>&1 | head -20
-        
-        print_info "Checking nginx logs..."
-        docker compose logs remnawave-nginx --tail=20
-        
+        echo "Register response: $REGISTER_RESPONSE"
+        echo "Login response: $LOGIN_RESPONSE"
         exit 1
     else
         print_success "Successfully logged in with existing admin account"
@@ -248,14 +219,17 @@ echo "$TOKEN" > /opt/remnawave/admin_token.txt
 chmod 600 /opt/remnawave/admin_token.txt
 print_success "Admin token saved"
 
-# Get public key
+# Get public key with proper headers
 print_warning "Getting public key for nodes..."
 
 PUBKEY_RESPONSE=$(curl -s -X GET "http://127.0.0.1:3000/api/keygen" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Host: $PANEL_DOMAIN" \
     -H "X-Forwarded-For: 127.0.0.1" \
-    -H "X-Forwarded-Proto: https")
+    -H "X-Forwarded-Proto: https" \
+    -H "X-Real-IP: 127.0.0.1" \
+    -H "X-Forwarded-Host: $PANEL_DOMAIN" \
+    -H "X-Forwarded-Port: 443")
 
 PUBKEY=$(echo "$PUBKEY_RESPONSE" | jq -r '.response.pubKey // empty' 2>/dev/null || echo "")
 
@@ -306,6 +280,17 @@ for port in 3000 3010 6767; do
         print_warning "Port $port is not listening"
     fi
 done
+
+# Test panel HTTPS access
+print_info "Testing panel HTTPS access..."
+PANEL_TEST=$(curl -s -k -w "\nHTTP_CODE:%{http_code}" "https://$PANEL_DOMAIN/auth/login?${COOKIES_RANDOM1}=${COOKIES_RANDOM2}")
+HTTP_CODE=$(echo "$PANEL_TEST" | grep "HTTP_CODE:" | cut -d: -f2)
+
+if [ "$HTTP_CODE" = "200" ]; then
+    print_success "Panel is accessible via HTTPS!"
+else
+    print_warning "Panel returned HTTP code: $HTTP_CODE (this may be normal)"
+fi
 
 # Save deployment information
 cat > /opt/remnawave/deployment_info.txt <<EOL
