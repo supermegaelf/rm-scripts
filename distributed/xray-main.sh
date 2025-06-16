@@ -60,20 +60,14 @@ print_success "Token loaded successfully"
 
 # Test token validity and refresh if needed
 echo "Testing token validity..."
-TEST_RESPONSE=$(curl -s -X GET "http://127.0.0.1:3000/api/system/health" \
-    -H "Authorization: Bearer $TOKEN" \
-    -H "Host: $PANEL_DOMAIN" \
-    -H "X-Forwarded-For: 127.0.0.1" \
-    -H "X-Forwarded-Proto: https")
+TEST_RESPONSE=$(docker exec remnawave curl -s -X GET "http://localhost:3000/api/system/health" \
+    -H "Authorization: Bearer $TOKEN")
 
-if echo "$TEST_RESPONSE" | grep -q "Unauthorized"; then
+if echo "$TEST_RESPONSE" | grep -q "Unauthorized" || [ -z "$TEST_RESPONSE" ]; then
     echo "Token expired, getting new token..."
     
-    LOGIN_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/login" \
+    LOGIN_RESPONSE=$(docker exec remnawave curl -s -X POST "http://localhost:3000/api/auth/login" \
         -H "Content-Type: application/json" \
-        -H "Host: $PANEL_DOMAIN" \
-        -H "X-Forwarded-For: 127.0.0.1" \
-        -H "X-Forwarded-Proto: https" \
         -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
     
     NEW_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.response.accessToken')
@@ -218,12 +212,9 @@ echo "Updating Xray configuration..."
 
 XRAY_CONFIG=$(cat /tmp/xray_config.json)
 
-UPDATE_RESPONSE=$(curl -s -X PUT "http://127.0.0.1:3000/api/xray" \
+UPDATE_RESPONSE=$(docker exec remnawave curl -s -X PUT "http://localhost:3000/api/xray" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
-    -H "Host: $PANEL_DOMAIN" \
-    -H "X-Forwarded-For: 127.0.0.1" \
-    -H "X-Forwarded-Proto: https" \
     -d "$XRAY_CONFIG")
 
 if echo "$UPDATE_RESPONSE" | jq -e '.response.config' > /dev/null; then
