@@ -236,6 +236,11 @@ else
     print_success "No errors found in logs"
 fi
 
+# Check HTTPS access
+echo -e "\n=== Checking HTTPS access ==="
+curl -s -I "https://$PANEL_DOMAIN" | head -n 1
+curl -s -I "https://$SUB_DOMAIN" | head -n 1
+
 # Check API functionality
 echo "Checking API..."
 
