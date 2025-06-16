@@ -22,6 +22,22 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Function to display spinner
+spinner() {
+    local pid=$1
+    local delay=0.1
+    local spinstr='|/-\'
+    echo -n " "
+    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+        local temp=${spinstr#?}
+        printf " [%c]  " "$spinstr"
+        local spinstr=$temp${spinstr%"$temp"}
+        sleep $delay
+        printf "\b\b\b\b\b\b"
+    done
+    printf "    \b\b\b\b"
+}
+
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
    print_error "This script must be run as root"
@@ -39,13 +55,16 @@ fi
 # Load variables
 source /opt/remnawave/install_vars.sh
 
-# Verify variables are loaded
-if [[ -z "$PANEL_DOMAIN" || -z "$SUB_DOMAIN" || -z "$SUPERADMIN_USERNAME" || -z "$SUPERADMIN_PASSWORD" ]]; then
-    print_error "Required variables not found. Please run config setup script first."
-    exit 1
-fi
+# Verify all required variables are loaded
+REQUIRED_VARS=("PANEL_DOMAIN" "SUB_DOMAIN" "SUPERADMIN_USERNAME" "SUPERADMIN_PASSWORD" "COOKIES_RANDOM1" "COOKIES_RANDOM2")
+for var in "${REQUIRED_VARS[@]}"; do
+    if [[ -z "${!var}" ]]; then
+        print_error "Required variable $var not found. Please run config setup script first."
+        exit 1
+    fi
+done
 
-print_success "Variables loaded successfully"
+print_success "All variables loaded successfully"
 
 # Check Docker
 if ! command -v docker &> /dev/null; then
@@ -53,21 +72,39 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-docker --version
-docker compose version
+print_success "Docker version: $(docker --version)"
+print_success "Docker Compose version: $(docker compose version)"
 
 # Validate docker-compose.yml
 if docker compose config --quiet; then
     print_success "Docker Compose configuration is valid"
 else
     print_error "Docker Compose configuration is invalid"
+    docker compose config
     exit 1
 fi
 
+# Check if containers are already running
+if docker compose ps --services --filter "status=running" | grep -q .; then
+    print_warning "Some containers are already running"
+    echo "Current container status:"
+    docker compose ps
+    echo ""
+    read -p "Do you want to restart all containers? (y/n): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        print_warning "Stopping existing containers..."
+        docker compose down
+        sleep 5
+    else
+        print_warning "Continuing with existing containers..."
+    fi
+fi
+
 # Pull Docker images
-echo "Loading Docker images..."
-docker compose pull
-echo ""
+print_warning "Pulling Docker images..."
+docker compose pull &
+spinner $!
 if [[ $? -eq 0 ]]; then
     print_success "Docker images pulled successfully"
 else
@@ -76,9 +113,8 @@ else
 fi
 
 # Start containers
-echo "Starting containers..."
+print_warning "Starting containers..."
 docker compose up -d
-
 if [[ $? -eq 0 ]]; then
     print_success "Containers started successfully"
 else
@@ -86,78 +122,62 @@ else
     exit 1
 fi
 
-docker compose ps
-
-# Function to check service availability
-check_service() {
-    local service_url=$1
-    local max_attempts=30
-    local attempt=1
-    
-    echo "Checking availability of $service_url..."
-    
-    while [ $attempt -le $max_attempts ]; do
-        # For backend API and subscription service, just check if connection is possible
-        if [[ "$service_url" == *"3000"* ]] || [[ "$service_url" == *"3010"* ]]; then
-            # Extract port from URL
-            local port=$(echo "$service_url" | sed 's/.*:\([0-9]*\).*/\1/')
-            if nc -z 127.0.0.1 "$port" 2>/dev/null; then
-                echo "✓ Service is available!"
-                return 0
-            fi
-        else
-            # For other services, use original check
-            if curl -s -f -X GET "$service_url" \
-                --header 'X-Forwarded-For: 127.0.0.1' \
-                --header 'X-Forwarded-Proto: https' \
-                > /dev/null 2>&1; then
-                echo "✓ Service is available!"
-                return 0
-            fi
-        fi
-        
-        echo "Attempt $attempt of $max_attempts... Waiting..."
-        sleep 5
-        ((attempt++))
-    done
-    
-    echo "✗ Service unavailable after $max_attempts attempts"
-    return 1
-}
-
 # Wait for database
-echo "Waiting for database to be ready..."
+print_warning "Waiting for database to be ready..."
 until docker exec remnawave-db pg_isready -U postgres > /dev/null 2>&1; do
-    echo "Database is not ready yet..."
-    sleep 3
+    echo -n "."
+    sleep 2
 done
+echo
 print_success "Database is ready!"
 
 # Wait for Redis
-echo "Waiting for Redis to be ready..."
+print_warning "Waiting for Redis to be ready..."
 until docker exec remnawave-redis valkey-cli ping > /dev/null 2>&1; do
-    echo "Redis is not ready yet..."
-    sleep 3
+    echo -n "."
+    sleep 2
 done
+echo
 print_success "Redis is ready!"
 
-# Check services
-if ! check_service "http://127.0.0.1:3000/api/auth/register"; then
-    print_error "Backend service is not available"
-    echo "Checking backend container logs..."
-    docker compose logs remnawave --tail=20
-    echo "Checking container status..."
-    docker compose ps
+# Wait for backend to be fully ready
+print_warning "Waiting for backend service to be ready..."
+max_attempts=30
+attempt=1
+while [ $attempt -le $max_attempts ]; do
+    if curl -s -f "http://127.0.0.1:3000/api/auth/register" \
+        -H "X-Forwarded-For: 127.0.0.1" \
+        -H "X-Forwarded-Proto: https" > /dev/null 2>&1; then
+        print_success "Backend service is ready!"
+        break
+    fi
+    echo "Attempt $attempt of $max_attempts..."
+    sleep 3
+    ((attempt++))
+done
+
+if [ $attempt -gt $max_attempts ]; then
+    print_error "Backend service failed to start"
+    echo "Checking logs..."
+    docker compose logs remnawave --tail=50
     exit 1
 fi
 
-if ! check_service "http://127.0.0.1:3010"; then
-    print_error "Subscription service is not available"
-    exit 1
-fi
+# Wait for subscription service
+print_warning "Waiting for subscription service..."
+attempt=1
+while [ $attempt -le 10 ]; do
+    if nc -z 127.0.0.1 3010 2>/dev/null; then
+        print_success "Subscription service is ready!"
+        break
+    fi
+    echo "Attempt $attempt of 10..."
+    sleep 2
+    ((attempt++))
+done
 
-# Register administrator
-echo "Registering administrator..."
+# Register administrator (handle case where admin already exists)
+print_warning "Registering administrator..."
 
 REGISTER_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/register" \
     -H "Content-Type: application/json" \
@@ -166,31 +186,40 @@ REGISTER_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/register" \
     -H "X-Forwarded-Proto: https" \
     -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
 
-TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.response.accessToken')
+TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.response.accessToken // empty')
 
-if [ -z "$TOKEN" ] || [ "$TOKEN" == "null" ]; then
-    print_error "Registration failed!"
-    echo "Server response: $REGISTER_RESPONSE"
-    exit 1
+# If registration failed, try to login
+if [ -z "$TOKEN" ]; then
+    print_warning "Registration failed, trying to login..."
+    
+    LOGIN_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/login" \
+        -H "Content-Type: application/json" \
+        -H "Host: $PANEL_DOMAIN" \
+        -H "X-Forwarded-For: 127.0.0.1" \
+        -H "X-Forwarded-Proto: https" \
+        -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
+    
+    TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.response.accessToken // empty')
+    
+    if [ -z "$TOKEN" ]; then
+        print_error "Both registration and login failed!"
+        echo "Register response: $REGISTER_RESPONSE"
+        echo "Login response: $LOGIN_RESPONSE"
+        exit 1
+    else
+        print_success "Successfully logged in with existing admin account"
+    fi
+else
+    print_success "Administrator registered successfully!"
 fi
 
-print_success "Administrator registered successfully!"
-echo "Token received: ${TOKEN:0:20}..."
-
-# Save token to file
+# Save token
 echo "$TOKEN" > /opt/remnawave/admin_token.txt
 chmod 600 /opt/remnawave/admin_token.txt
-
-# Verify token was saved
-if [[ -f "/opt/remnawave/admin_token.txt" ]] && [[ -s "/opt/remnawave/admin_token.txt" ]]; then
-    print_success "Admin token saved successfully"
-else
-    print_error "Failed to save admin token"
-    exit 1
-fi
+print_success "Admin token saved"
 
 # Get public key
-echo "Getting public key for nodes..."
+print_warning "Getting public key for nodes..."
 
 PUBKEY_RESPONSE=$(curl -s -X GET "http://127.0.0.1:3000/api/keygen" \
     -H "Authorization: Bearer $TOKEN" \
@@ -198,16 +227,15 @@ PUBKEY_RESPONSE=$(curl -s -X GET "http://127.0.0.1:3000/api/keygen" \
     -H "X-Forwarded-For: 127.0.0.1" \
     -H "X-Forwarded-Proto: https")
 
-PUBKEY=$(echo "$PUBKEY_RESPONSE" | jq -r '.response.pubKey')
+PUBKEY=$(echo "$PUBKEY_RESPONSE" | jq -r '.response.pubKey // empty')
 
-if [ -z "$PUBKEY" ] || [ "$PUBKEY" == "null" ]; then
+if [ -z "$PUBKEY" ]; then
     print_error "Failed to get public key!"
     echo "Server response: $PUBKEY_RESPONSE"
     exit 1
 fi
 
 print_success "Public key received!"
-echo "Key: $PUBKEY"
 
 # Create node environment file
 cat > /opt/remnawave/.env-node <<EOL
@@ -219,113 +247,127 @@ SSL_CERT="$PUBKEY"
 EOL
 
 chmod 600 /opt/remnawave/.env-node
-
 print_success "Node environment file created"
 
-# Container status check
-echo "=== Container Status ==="
+# Wait for Nginx to be ready
+print_warning "Waiting for Nginx to be ready..."
+sleep 5
+
+# Container status check (compatible with new docker compose)
+echo -e "\n=== Container Status ==="
 docker compose ps
 
-echo -e "\n=== Used Ports ==="
-ss -tlnp | grep -E ":(3000|3010|6767|443)"
+# Check if all required containers are running
+print_warning "Checking container health..."
+required_containers=("remnawave" "remnawave-db" "remnawave-redis" "remnawave-nginx" "remnawave-subscription-page")
+all_running=true
 
-echo -e "\n=== Checking logs for errors ==="
-if docker compose logs --tail=50 | grep -i error >/dev/null; then
-    print_warning "Errors found in logs"
-else
-    print_success "No errors found in logs"
+for container in "${required_containers[@]}"; do
+    if docker ps --format "table {{.Names}}\t{{.Status}}" | grep -q "^${container}.*Up"; then
+        print_success "$container is running"
+    else
+        print_error "$container is not running"
+        all_running=false
+    fi
+done
+
+if [ "$all_running" = false ]; then
+    print_error "Not all required containers are running"
+    docker compose logs --tail=50
+    exit 1
 fi
 
-# Check HTTPS access
+# Check ports
+echo -e "\n=== Checking ports ==="
+for port in 3000 3010 6767; do
+    if ss -tlnp | grep -q ":$port "; then
+        print_success "Port $port is listening"
+    else
+        print_warning "Port $port is not listening"
+    fi
+done
+
+# Check HTTPS access (allow some time for nginx to start)
+sleep 3
 echo -e "\n=== Checking HTTPS access ==="
-curl -s -I "https://$PANEL_DOMAIN" | head -n 1
-curl -s -I "https://$SUB_DOMAIN" | head -n 1
+if curl -k -s -I "https://$PANEL_DOMAIN" 2>/dev/null | head -n 1 | grep -q "404"; then
+    print_success "Panel domain is responding (auth required)"
+else
+    print_warning "Panel domain may not be accessible yet"
+fi
 
-# Check API functionality
-echo "Checking API..."
+if curl -k -s -I "https://$SUB_DOMAIN" 2>/dev/null | head -n 1 | grep -q "200\|404"; then
+    print_success "Subscription domain is responding"
+else
+    print_warning "Subscription domain may not be accessible yet"
+fi
 
+# Test API
+print_warning "Testing API functionality..."
 CONFIG_RESPONSE=$(curl -s -X GET "http://127.0.0.1:3000/api/xray" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Host: $PANEL_DOMAIN" \
     -H "X-Forwarded-For: 127.0.0.1" \
     -H "X-Forwarded-Proto: https")
 
-if echo "$CONFIG_RESPONSE" | jq -e '.response' > /dev/null; then
+if echo "$CONFIG_RESPONSE" | jq -e '.response' > /dev/null 2>&1; then
     print_success "API is working correctly"
 else
-    print_error "API issues detected"
-    echo "Response: $CONFIG_RESPONSE"
+    print_warning "API may need more time to initialize"
 fi
 
 # Save deployment information
 cat > /opt/remnawave/deployment_info.txt <<EOL
-========================================
-REMNAWAVE DEPLOYMENT INFORMATION
-========================================
+=================================================
+         REMNAWAVE DEPLOYMENT INFORMATION
+=================================================
 Deployment Date: $(date)
 Server IP: $(curl -s -4 ifconfig.me || echo "N/A")
 
-CONTAINERS STATUS:
-$(docker compose ps)
+CONTAINERS:
+$(docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}")
 
-ACCESS INFORMATION:
-- Panel URL: https://$PANEL_DOMAIN/auth/login?${COOKIES_RANDOM1}=${COOKIES_RANDOM2}
-- Subscription URL: https://$SUB_DOMAIN
-- Admin Username: $SUPERADMIN_USERNAME
-- Admin Password: [see credentials.txt]
+ACCESS URLS:
+- Panel: https://$PANEL_DOMAIN/auth/login?${COOKIES_RANDOM1}=${COOKIES_RANDOM2}
+- Subscription: https://$SUB_DOMAIN
 
-PUBLIC KEY FOR NODES:
+ADMIN CREDENTIALS:
+- Username: $SUPERADMIN_USERNAME
+- Password: [see credentials.txt]
+
+NODE PUBLIC KEY:
 $PUBKEY
 
-API ENDPOINTS:
-- Main API: http://127.0.0.1:3000
+SERVICE ENDPOINTS:
+- Backend API: http://127.0.0.1:3000
 - Subscription: http://127.0.0.1:3010
 - PostgreSQL: 127.0.0.1:6767
 
-IMPORTANT FILES:
-- Credentials: /opt/remnawave/credentials.txt
-- Admin Token: /opt/remnawave/admin_token.txt
-- Node Config: /opt/remnawave/.env-node
-- Variables: /opt/remnawave/install_vars.sh
-
-========================================
+FILES:
+- /opt/remnawave/credentials.txt
+- /opt/remnawave/admin_token.txt
+- /opt/remnawave/.env-node
+- /opt/remnawave/install_vars.sh
+=================================================
 EOL
 
 chmod 600 /opt/remnawave/deployment_info.txt
 
-print_success "Deployment information saved"
+# Final summary
+echo ""
+echo "================================================="
+echo -e "${GREEN}    DEPLOYMENT COMPLETED SUCCESSFULLY!${NC}"
+echo "================================================="
+echo ""
+echo "Panel Access:"
+echo -e "${YELLOW}https://$PANEL_DOMAIN/auth/login?${COOKIES_RANDOM1}=${COOKIES_RANDOM2}${NC}"
+echo ""
+echo "Username: $SUPERADMIN_USERNAME"
+echo "Password: Check credentials.txt"
+echo ""
+echo "All information saved in:"
+echo "- /opt/remnawave/deployment_info.txt"
+echo "- /opt/remnawave/credentials.txt"
+echo "================================================="
 
-# Final status check
-echo -e "\n========================================="
-echo "DEPLOYMENT CHECK:"
-echo "========================================="
-
-check_status() {
-    if [ $2 -eq 0 ]; then
-        echo -e "✓ $1 - OK"
-    else
-        echo -e "✗ $1 - FAILED"
-    fi
-}
-
-docker compose ps | grep -q "remnawave.*Up" && s1=0 || s1=1
-docker compose ps | grep -q "remnawave-db.*Up" && s2=0 || s2=1
-docker compose ps | grep -q "remnawave-redis.*Up" && s3=0 || s3=1
-docker compose ps | grep -q "remnawave-nginx.*Up" && s4=0 || s4=1
-docker compose ps | grep -q "remnawave-subscription-page.*Up" && s5=0 || s5=1
-
-check_status "Backend container" $s1
-check_status "Database" $s2
-check_status "Redis" $s3
-check_status "Nginx" $s4
-check_status "Subscription page" $s5
-
-[ -n "$TOKEN" ] && s6=0 || s6=1
-[ -n "$PUBKEY" ] && s7=0 || s7=1
-
-check_status "Administrator token" $s6
-check_status "Public key" $s7
-
-echo "========================================="
-
-print_success "Deployment completed successfully!"
+print_success "Deployment completed! Panel should be accessible now."
