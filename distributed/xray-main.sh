@@ -45,44 +45,27 @@ source /opt/remnawave/install_vars.sh
 
 # Load or create admin token
 if [[ ! -f "/opt/remnawave/admin_token.txt" ]] || [[ ! -s "/opt/remnawave/admin_token.txt" ]]; then
-    echo "Admin token not found, creating new token..."
+    echo "Admin token not found, trying to get existing token via login..."
     
-    # Try to get token via register first (for fresh install)
-    REGISTER_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/register" \
+    # Try login first (user should already exist after deployment)
+    LOGIN_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/login" \
         -H "Content-Type: application/json" \
         -H "Host: $PANEL_DOMAIN" \
         -H "X-Forwarded-For: 127.0.0.1" \
         -H "X-Forwarded-Proto: https" \
         -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
     
-    REG_TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.response.accessToken')
+    LOGIN_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.response.accessToken')
     
-    if [ -n "$REG_TOKEN" ] && [ "$REG_TOKEN" != "null" ]; then
-        echo "$REG_TOKEN" > /opt/remnawave/admin_token.txt
+    if [ -n "$LOGIN_TOKEN" ] && [ "$LOGIN_TOKEN" != "null" ]; then
+        echo "$LOGIN_TOKEN" > /opt/remnawave/admin_token.txt
         chmod 600 /opt/remnawave/admin_token.txt
-        print_success "Token created via register"
+        print_success "Token obtained via login"
     else
-        # Try login if register failed (user already exists)
-        echo "Register failed, trying login..."
-        LOGIN_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/login" \
-            -H "Content-Type: application/json" \
-            -H "Host: $PANEL_DOMAIN" \
-            -H "X-Forwarded-For: 127.0.0.1" \
-            -H "X-Forwarded-Proto: https" \
-            -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
-        
-        LOGIN_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.response.accessToken')
-        
-        if [ -n "$LOGIN_TOKEN" ] && [ "$LOGIN_TOKEN" != "null" ]; then
-            echo "$LOGIN_TOKEN" > /opt/remnawave/admin_token.txt
-            chmod 600 /opt/remnawave/admin_token.txt
-            print_success "Token created via login"
-        else
-            print_error "Failed to create token via both register and login"
-            echo "Register response: $REGISTER_RESPONSE"
-            echo "Login response: $LOGIN_RESPONSE"
-            exit 1
-        fi
+        print_error "Failed to get token via login"
+        echo "Login response: $LOGIN_RESPONSE"
+        print_error "Make sure the panel is running and credentials are correct"
+        exit 1
     fi
 fi
 
