@@ -388,52 +388,6 @@ docker compose ps
 
 print_success "Containers restarted"
 
-# Check configuration
-echo -e "\n=== CONFIGURATION CHECK ==="
-
-CHECK_CONFIG=$(curl -s -X GET "http://127.0.0.1:3000/api/xray" \
-    -H "Authorization: Bearer $TOKEN" \
-    -H "Host: $PANEL_DOMAIN" \
-    -H "X-Forwarded-For: 127.0.0.1" \
-    -H "X-Forwarded-Proto: https")
-
-if echo "$CHECK_CONFIG" | jq -e '.response.config.inbounds[0]' > /dev/null; then
-    print_success "Xray configuration is active"
-    echo "  - Inbound tag: $(echo "$CHECK_CONFIG" | jq -r '.response.config.inbounds[0].tag')"
-    echo "  - Protocol: $(echo "$CHECK_CONFIG" | jq -r '.response.config.inbounds[0].protocol')"
-    echo "  - Port: $(echo "$CHECK_CONFIG" | jq -r '.response.config.inbounds[0].port')"
-else
-    print_warning "Issue with Xray configuration"
-fi
-
-NODES_CHECK=$(curl -s -X GET "http://127.0.0.1:3000/api/nodes" \
-    -H "Authorization: Bearer $TOKEN" \
-    -H "Host: $PANEL_DOMAIN" \
-    -H "X-Forwarded-For: 127.0.0.1" \
-    -H "X-Forwarded-Proto: https")
-
-if echo "$NODES_CHECK" | jq -e '.response[0]' > /dev/null; then
-    print_success "Node is registered"
-    echo "  - Name: $(echo "$NODES_CHECK" | jq -r '.response[0].name')"
-    echo "  - Address: $(echo "$NODES_CHECK" | jq -r '.response[0].address')"
-else
-    print_warning "Node not found"
-fi
-
-HOSTS_CHECK=$(curl -s -X GET "http://127.0.0.1:3000/api/hosts" \
-    -H "Authorization: Bearer $TOKEN" \
-    -H "Host: $PANEL_DOMAIN" \
-    -H "X-Forwarded-For: 127.0.0.1" \
-    -H "X-Forwarded-Proto: https")
-
-if echo "$HOSTS_CHECK" | jq -e '.response[0]' > /dev/null; then
-    print_success "Host is created"
-    echo "  - Remark: $(echo "$HOSTS_CHECK" | jq -r '.response[0].remark')"
-    echo "  - Address: $(echo "$HOSTS_CHECK" | jq -r '.response[0].address')"
-else
-    print_warning "Host not found"
-fi
-
 echo "===================================="
 
 print_success "Xray configuration completed successfully!"
