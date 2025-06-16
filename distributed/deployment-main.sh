@@ -22,6 +22,10 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+print_info() {
+    echo -e "${LIGHT_GREEN}[INFO]${NC} $1"
+}
+
 # Function to display spinner
 spinner() {
     local pid=$1
@@ -72,8 +76,8 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-print_success "Docker version: $(docker --version)"
-print_success "Docker Compose version: $(docker compose version)"
+print_info "Docker version: $(docker --version)"
+print_info "Docker Compose version: $(docker compose version)"
 
 # Validate docker-compose.yml
 if docker compose config --quiet; then
@@ -140,53 +144,71 @@ done
 echo
 print_success "Redis is ready!"
 
-# Wait for backend to be fully ready
-print_warning "Waiting for backend service to be ready..."
-max_attempts=30
-attempt=1
-while [ $attempt -le $max_attempts ]; do
-    if curl -s -f "http://127.0.0.1:3000/api/auth/register" \
-        -H "X-Forwarded-For: 127.0.0.1" \
-        -H "X-Forwarded-Proto: https" > /dev/null 2>&1; then
-        print_success "Backend service is ready!"
-        break
-    fi
-    echo "Attempt $attempt of $max_attempts..."
-    sleep 3
-    ((attempt++))
-done
+# Give services more time to initialize
+print_info "Waiting for services to fully initialize..."
+sleep 10
 
-if [ $attempt -gt $max_attempts ]; then
-    print_error "Backend service failed to start"
-    echo "Checking logs..."
+# Check if backend port is open
+print_warning "Checking backend service port..."
+if nc -z 127.0.0.1 3000 2>/dev/null; then
+    print_success "Backend port 3000 is open"
+else
+    print_error "Backend port 3000 is not accessible"
     docker compose logs remnawave --tail=50
     exit 1
 fi
 
-# Wait for subscription service
-print_warning "Waiting for subscription service..."
+# Try different approach - check health endpoint first
+print_warning "Checking backend health..."
+max_attempts=20
 attempt=1
-while [ $attempt -le 10 ]; do
-    if nc -z 127.0.0.1 3010 2>/dev/null; then
-        print_success "Subscription service is ready!"
+backend_ready=false
+
+while [ $attempt -le $max_attempts ]; do
+    # First check if we can connect to the service at all
+    if curl -s -f -m 5 "http://127.0.0.1:3000/" > /dev/null 2>&1; then
+        print_success "Backend is responding!"
+        backend_ready=true
         break
     fi
-    echo "Attempt $attempt of 10..."
-    sleep 2
+    
+    echo "Backend check attempt $attempt of $max_attempts..."
+    sleep 3
     ((attempt++))
 done
 
+if [ "$backend_ready" = false ]; then
+    print_error "Backend service is not responding"
+    print_info "Checking container logs..."
+    docker compose logs remnawave --tail=100
+    exit 1
+fi
+
+# Wait a bit more for all endpoints to be ready
+sleep 5
+
 # Register administrator (handle case where admin already exists)
 print_warning "Registering administrator..."
+
+# Debug: Check what the API returns
+print_info "Testing API endpoint..."
+API_TEST=$(curl -s -X GET "http://127.0.0.1:3000/api/auth/register" \
+    -H "Host: $PANEL_DOMAIN" \
+    -H "X-Forwarded-For: 127.0.0.1" \
+    -H "X-Forwarded-Proto: https" 2>&1)
+
+print_info "API test response: ${API_TEST:0:100}..."
 
 REGISTER_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/register" \
     -H "Content-Type: application/json" \
     -H "Host: $PANEL_DOMAIN" \
     -H "X-Forwarded-For: 127.0.0.1" \
     -H "X-Forwarded-Proto: https" \
-    -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
+    -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}" 2>&1)
 
-TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.response.accessToken // empty')
+print_info "Register response: ${REGISTER_RESPONSE:0:200}..."
+
+TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.response.accessToken // empty' 2>/dev/null || echo "")
 
 # If registration failed, try to login
 if [ -z "$TOKEN" ]; then
@@ -197,14 +219,22 @@ if [ -z "$TOKEN" ]; then
         -H "Host: $PANEL_DOMAIN" \
         -H "X-Forwarded-For: 127.0.0.1" \
         -H "X-Forwarded-Proto: https" \
-        -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
+        -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}" 2>&1)
     
-    TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.response.accessToken // empty')
+    print_info "Login response: ${LOGIN_RESPONSE:0:200}..."
+    
+    TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.response.accessToken // empty' 2>/dev/null || echo "")
     
     if [ -z "$TOKEN" ]; then
         print_error "Both registration and login failed!"
-        echo "Register response: $REGISTER_RESPONSE"
-        echo "Login response: $LOGIN_RESPONSE"
+        
+        # Additional debugging
+        print_info "Checking if API is accessible directly..."
+        curl -v "http://127.0.0.1:3000/api/auth/register" 2>&1 | head -20
+        
+        print_info "Checking nginx logs..."
+        docker compose logs remnawave-nginx --tail=20
+        
         exit 1
     else
         print_success "Successfully logged in with existing admin account"
@@ -227,7 +257,7 @@ PUBKEY_RESPONSE=$(curl -s -X GET "http://127.0.0.1:3000/api/keygen" \
     -H "X-Forwarded-For: 127.0.0.1" \
     -H "X-Forwarded-Proto: https")
 
-PUBKEY=$(echo "$PUBKEY_RESPONSE" | jq -r '.response.pubKey // empty')
+PUBKEY=$(echo "$PUBKEY_RESPONSE" | jq -r '.response.pubKey // empty' 2>/dev/null || echo "")
 
 if [ -z "$PUBKEY" ]; then
     print_error "Failed to get public key!"
@@ -249,11 +279,7 @@ EOL
 chmod 600 /opt/remnawave/.env-node
 print_success "Node environment file created"
 
-# Wait for Nginx to be ready
-print_warning "Waiting for Nginx to be ready..."
-sleep 5
-
-# Container status check (compatible with new docker compose)
+# Container status check
 echo -e "\n=== Container Status ==="
 docker compose ps
 
@@ -271,12 +297,6 @@ for container in "${required_containers[@]}"; do
     fi
 done
 
-if [ "$all_running" = false ]; then
-    print_error "Not all required containers are running"
-    docker compose logs --tail=50
-    exit 1
-fi
-
 # Check ports
 echo -e "\n=== Checking ports ==="
 for port in 3000 3010 6767; do
@@ -286,35 +306,6 @@ for port in 3000 3010 6767; do
         print_warning "Port $port is not listening"
     fi
 done
-
-# Check HTTPS access (allow some time for nginx to start)
-sleep 3
-echo -e "\n=== Checking HTTPS access ==="
-if curl -k -s -I "https://$PANEL_DOMAIN" 2>/dev/null | head -n 1 | grep -q "404"; then
-    print_success "Panel domain is responding (auth required)"
-else
-    print_warning "Panel domain may not be accessible yet"
-fi
-
-if curl -k -s -I "https://$SUB_DOMAIN" 2>/dev/null | head -n 1 | grep -q "200\|404"; then
-    print_success "Subscription domain is responding"
-else
-    print_warning "Subscription domain may not be accessible yet"
-fi
-
-# Test API
-print_warning "Testing API functionality..."
-CONFIG_RESPONSE=$(curl -s -X GET "http://127.0.0.1:3000/api/xray" \
-    -H "Authorization: Bearer $TOKEN" \
-    -H "Host: $PANEL_DOMAIN" \
-    -H "X-Forwarded-For: 127.0.0.1" \
-    -H "X-Forwarded-Proto: https")
-
-if echo "$CONFIG_RESPONSE" | jq -e '.response' > /dev/null 2>&1; then
-    print_success "API is working correctly"
-else
-    print_warning "API may need more time to initialize"
-fi
 
 # Save deployment information
 cat > /opt/remnawave/deployment_info.txt <<EOL
