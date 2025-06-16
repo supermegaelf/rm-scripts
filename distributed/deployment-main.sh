@@ -67,7 +67,7 @@ fi
 # Pull Docker images
 echo "Loading Docker images..."
 docker compose pull
-
+echo ""
 if [[ $? -eq 0 ]]; then
     print_success "Docker images pulled successfully"
 else
