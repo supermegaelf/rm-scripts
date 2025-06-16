@@ -47,35 +47,40 @@ source /opt/remnawave/install_vars.sh
 if [[ ! -f "/opt/remnawave/admin_token.txt" ]] || [[ ! -s "/opt/remnawave/admin_token.txt" ]]; then
     echo "Admin token not found, creating new token..."
     
-    # Try to get token via login
-    TOKEN_RESPONSE=$(docker exec remnawave curl -s -X POST "http://localhost:3000/api/auth/login" \
+    # Try to get token via register first (for fresh install)
+    REGISTER_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/register" \
         -H "Content-Type: application/json" \
+        -H "Host: $PANEL_DOMAIN" \
+        -H "X-Forwarded-For: 127.0.0.1" \
+        -H "X-Forwarded-Proto: https" \
         -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
     
-    NEW_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.response.accessToken')
+    REG_TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.response.accessToken')
     
-    if [ -n "$NEW_TOKEN" ] && [ "$NEW_TOKEN" != "null" ]; then
-        echo "$NEW_TOKEN" > /opt/remnawave/admin_token.txt
+    if [ -n "$REG_TOKEN" ] && [ "$REG_TOKEN" != "null" ]; then
+        echo "$REG_TOKEN" > /opt/remnawave/admin_token.txt
         chmod 600 /opt/remnawave/admin_token.txt
-        print_success "Token created via login"
+        print_success "Token created via register"
     else
-        # Try register if login failed
-        echo "Login failed, trying register..."
-        REGISTER_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/register" \
+        # Try login if register failed (user already exists)
+        echo "Register failed, trying login..."
+        LOGIN_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/login" \
             -H "Content-Type: application/json" \
             -H "Host: $PANEL_DOMAIN" \
             -H "X-Forwarded-For: 127.0.0.1" \
             -H "X-Forwarded-Proto: https" \
             -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
         
-        REG_TOKEN=$(echo "$REGISTER_RESPONSE" | jq -r '.response.accessToken')
+        LOGIN_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.response.accessToken')
         
-        if [ -n "$REG_TOKEN" ] && [ "$REG_TOKEN" != "null" ]; then
-            echo "$REG_TOKEN" > /opt/remnawave/admin_token.txt
+        if [ -n "$LOGIN_TOKEN" ] && [ "$LOGIN_TOKEN" != "null" ]; then
+            echo "$LOGIN_TOKEN" > /opt/remnawave/admin_token.txt
             chmod 600 /opt/remnawave/admin_token.txt
-            print_success "Token created via register"
+            print_success "Token created via login"
         else
-            print_error "Failed to create token via both login and register"
+            print_error "Failed to create token via both register and login"
+            echo "Register response: $REGISTER_RESPONSE"
+            echo "Login response: $LOGIN_RESPONSE"
             exit 1
         fi
     fi
@@ -357,7 +362,7 @@ Reality Keys:
 - Short ID: $SHORT_ID
 
 SSL Certificate for Node:
-$(cat /opt/remnawave/.env-node | grep SSL_CERT)
+$(cat /opt/remnawave/.env-node | grep SSL_CERT 2>/dev/null || echo "SSL_CERT not found")
 
 ========================================
 EOL
