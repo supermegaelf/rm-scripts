@@ -66,10 +66,6 @@ echo "Username: $SUPERADMIN_USERNAME" >> credentials.txt
 echo "Password: $SUPERADMIN_PASSWORD" >> credentials.txt
 echo "===================================" >> credentials.txt
 
-cat credentials.txt
-
-print_success "Credentials generated and saved to credentials.txt"
-
 # Create .env file
 cat > .env <<EOL
 ### APP ###
@@ -340,6 +336,14 @@ EOL
 chmod 600 /opt/remnawave/install_vars.sh
 
 print_success "Installation variables saved to install_vars.sh"
+
+# Display credentials prominently
+echo -e "\n========================================="
+echo "IMPORTANT: SAVE THESE CREDENTIALS"
+echo "========================================="
+cat credentials.txt
+echo "========================================="
+print_success "Credentials generated and saved to credentials.txt"
 
 # Check created files
 ls -la /opt/remnawave/
