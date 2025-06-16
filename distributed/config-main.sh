@@ -26,14 +26,50 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Extract base domain from subdomain
+extract_domain() {
+    local SUBDOMAIN=$1
+    echo "$SUBDOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}'
+}
+
+# Generate secure password
+generate_password() {
+    local length=24
+    local password=""
+    local upper_chars='A-Z'
+    local lower_chars='a-z'
+    local digit_chars='0-9'
+    local special_chars='!@#%^&*()_+'
+    local all_chars='A-Za-z0-9!@#%^&*()_+'
+
+    # Ensure at least one of each type
+    password+=$(head /dev/urandom | tr -dc "$upper_chars" | head -c 1)
+    password+=$(head /dev/urandom | tr -dc "$lower_chars" | head -c 1)
+    password+=$(head /dev/urandom | tr -dc "$digit_chars" | head -c 1)
+    password+=$(head /dev/urandom | tr -dc "$special_chars" | head -c 3)
+    password+=$(head /dev/urandom | tr -dc "$all_chars" | head -c $(($length - 6)))
+
+    # Shuffle password
+    password=$(echo "$password" | fold -w1 | shuf | tr -d '\n')
+    echo "$password"
+}
+
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
    print_error "This script must be run as root"
    exit 1
 fi
 
+# Check if in correct directory
+if [[ ! -d "/opt/remnawave" ]]; then
+    print_error "Directory /opt/remnawave does not exist. Run prep-main.sh first."
+    exit 1
+fi
+
+cd /opt/remnawave
+
 # Prompt for domain variables
-print_input "Panel Domain (e.g., example.com): "
+print_input "Panel Domain (e.g., panel.example.com): "
 read PANEL_DOMAIN
 if [[ -z "$PANEL_DOMAIN" ]]; then
     print_error "Panel Domain cannot be empty"
@@ -47,24 +83,48 @@ if [[ -z "$SUB_DOMAIN" ]]; then
     exit 1
 fi
 
-cd /opt/remnawave
+print_input "Selfsteal Domain for node (e.g., node.example.com): "
+read SELFSTEAL_DOMAIN
+if [[ -z "$SELFSTEAL_DOMAIN" ]]; then
+    print_error "Selfsteal Domain cannot be empty"
+    exit 1
+fi
+
+# Check that all domains are unique
+if [ "$PANEL_DOMAIN" = "$SUB_DOMAIN" ] || [ "$PANEL_DOMAIN" = "$SELFSTEAL_DOMAIN" ] || [ "$SUB_DOMAIN" = "$SELFSTEAL_DOMAIN" ]; then
+    print_error "All domains (panel, subscription, and node) must be unique"
+    exit 1
+fi
+
+# Extract base domains
+PANEL_BASE_DOMAIN=$(extract_domain "$PANEL_DOMAIN")
+SUB_BASE_DOMAIN=$(extract_domain "$SUB_DOMAIN")
+
+print_success "Panel base domain: $PANEL_BASE_DOMAIN"
+print_success "Sub base domain: $SUB_BASE_DOMAIN"
 
 # Generate random credentials
 SUPERADMIN_USERNAME=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
-SUPERADMIN_PASSWORD=$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9!@#%^&*()_+' | fold -w 24 | head -n 1)
+SUPERADMIN_PASSWORD=$(generate_password)
 COOKIES_RANDOM1=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
 COOKIES_RANDOM2=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
 METRICS_USER=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
-METRICS_PASS=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
+METRICS_PASS=$(generate_password)
 JWT_AUTH_SECRET=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 64)
 JWT_API_TOKENS_SECRET=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 64)
 
 # Create credentials file
-echo "=== ВАЖНО: СОХРАНИТЕ ЭТИ ДАННЫЕ ===" > credentials.txt
-echo "Panel URL: https://$PANEL_DOMAIN/auth/login?${COOKIES_RANDOM1}=${COOKIES_RANDOM2}" >> credentials.txt
-echo "Username: $SUPERADMIN_USERNAME" >> credentials.txt
-echo "Password: $SUPERADMIN_PASSWORD" >> credentials.txt
-echo "===================================" >> credentials.txt
+cat > credentials.txt <<EOL
+=================================================
+               ВАЖНО: СОХРАНИТЕ ЭТИ ДАННЫЕ
+=================================================
+Panel URL: https://$PANEL_DOMAIN/auth/login?${COOKIES_RANDOM1}=${COOKIES_RANDOM2}
+Username: $SUPERADMIN_USERNAME
+Password: $SUPERADMIN_PASSWORD
+-------------------------------------------------
+Selfsteal Domain: $SELFSTEAL_DOMAIN
+=================================================
+EOL
 
 # Create .env file
 cat > .env <<EOL
@@ -170,8 +230,30 @@ EOL
 
 print_success ".env file created successfully"
 
-# Define certificate domain (use panel domain as base)
-CERT_DOMAIN="$PANEL_DOMAIN"
+# Determine certificate paths
+PANEL_CERT_DOMAIN="$PANEL_BASE_DOMAIN"
+SUB_CERT_DOMAIN="$SUB_BASE_DOMAIN"
+
+# Check if certificates exist
+if [[ ! -d "/etc/letsencrypt/live/$PANEL_CERT_DOMAIN" ]]; then
+    # Try with full domain
+    if [[ -d "/etc/letsencrypt/live/$PANEL_DOMAIN" ]]; then
+        PANEL_CERT_DOMAIN="$PANEL_DOMAIN"
+    else
+        print_error "Certificate not found for $PANEL_DOMAIN. Run ssl-main.sh first."
+        exit 1
+    fi
+fi
+
+if [[ ! -d "/etc/letsencrypt/live/$SUB_CERT_DOMAIN" ]]; then
+    # Try with full domain
+    if [[ -d "/etc/letsencrypt/live/$SUB_DOMAIN" ]]; then
+        SUB_CERT_DOMAIN="$SUB_DOMAIN"
+    else
+        print_error "Certificate not found for $SUB_DOMAIN. Run ssl-main.sh first."
+        exit 1
+    fi
+fi
 
 # Create docker-compose.yml
 cat > docker-compose.yml <<EOL
@@ -254,10 +336,10 @@ services:
     restart: always
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - /etc/letsencrypt/live/$CERT_DOMAIN/fullchain.pem:/etc/nginx/ssl/$PANEL_DOMAIN/fullchain.pem:ro
-      - /etc/letsencrypt/live/$CERT_DOMAIN/privkey.pem:/etc/nginx/ssl/$PANEL_DOMAIN/privkey.pem:ro
-      - /etc/letsencrypt/live/$CERT_DOMAIN/fullchain.pem:/etc/nginx/ssl/$SUB_DOMAIN/fullchain.pem:ro
-      - /etc/letsencrypt/live/$CERT_DOMAIN/privkey.pem:/etc/nginx/ssl/$SUB_DOMAIN/privkey.pem:ro
+      - /etc/letsencrypt/live/$PANEL_CERT_DOMAIN/fullchain.pem:/etc/nginx/ssl/$PANEL_DOMAIN/fullchain.pem:ro
+      - /etc/letsencrypt/live/$PANEL_CERT_DOMAIN/privkey.pem:/etc/nginx/ssl/$PANEL_DOMAIN/privkey.pem:ro
+      - /etc/letsencrypt/live/$SUB_CERT_DOMAIN/fullchain.pem:/etc/nginx/ssl/$SUB_DOMAIN/fullchain.pem:ro
+      - /etc/letsencrypt/live/$SUB_CERT_DOMAIN/privkey.pem:/etc/nginx/ssl/$SUB_DOMAIN/privkey.pem:ro
     network_mode: host
     depends_on:
       - remnawave
@@ -307,6 +389,118 @@ EOL
 
 print_success "docker-compose.yml file created successfully"
 
+# Create nginx.conf
+cat > nginx.conf <<EOL
+upstream remnawave {
+    server 127.0.0.1:3000;
+}
+
+upstream json {
+    server 127.0.0.1:3010;
+}
+
+map \$http_upgrade \$connection_upgrade {
+    default upgrade;
+    ""      close;
+}
+
+map \$http_cookie \$auth_cookie {
+    default 0;
+    "~*${COOKIES_RANDOM1}=${COOKIES_RANDOM2}" 1;
+}
+
+map \$arg_${COOKIES_RANDOM1} \$auth_query {
+    default 0;
+    "${COOKIES_RANDOM2}" 1;
+}
+
+map "\$auth_cookie\$auth_query" \$authorized {
+    "~1" 1;
+    default 0;
+}
+
+map \$arg_${COOKIES_RANDOM1} \$set_cookie_header {
+    "${COOKIES_RANDOM2}" "${COOKIES_RANDOM1}=${COOKIES_RANDOM2}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=31536000";
+    default "";
+}
+
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_ecdh_curve X25519:prime256v1:secp384r1;
+ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305;
+ssl_prefer_server_ciphers on;
+ssl_session_timeout 1d;
+ssl_session_cache shared:MozSSL:10m;
+
+server {
+    server_name $PANEL_DOMAIN;
+    listen 443 ssl;
+    http2 on;
+
+    ssl_certificate "/etc/nginx/ssl/$PANEL_DOMAIN/fullchain.pem";
+    ssl_certificate_key "/etc/nginx/ssl/$PANEL_DOMAIN/privkey.pem";
+    ssl_trusted_certificate "/etc/nginx/ssl/$PANEL_DOMAIN/fullchain.pem";
+
+    add_header Set-Cookie \$set_cookie_header;
+
+    location / {
+        if (\$authorized = 0) {
+            return 404;
+        }
+        proxy_http_version 1.1;
+        proxy_pass http://remnawave;
+        proxy_set_header Host \$host;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
+
+server {
+    server_name $SUB_DOMAIN;
+    listen 443 ssl;
+    http2 on;
+
+    ssl_certificate "/etc/nginx/ssl/$SUB_DOMAIN/fullchain.pem";
+    ssl_certificate_key "/etc/nginx/ssl/$SUB_DOMAIN/privkey.pem";
+    ssl_trusted_certificate "/etc/nginx/ssl/$SUB_DOMAIN/fullchain.pem";
+
+    location / {
+        proxy_http_version 1.1;
+        proxy_pass http://json;
+        proxy_set_header Host \$host;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \$connection_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_intercept_errors on;
+        error_page 400 404 500 502 @redirect;
+    }
+
+    location @redirect {
+        return 404;
+    }
+}
+
+server {
+    listen 443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+}
+EOL
+
+print_success "nginx.conf file created successfully"
+
 # Validate docker-compose.yml
 if docker compose config --quiet; then
     print_success "docker-compose.yml is valid"
@@ -315,18 +509,11 @@ else
     exit 1
 fi
 
-# Export variables for next steps
-export PANEL_DOMAIN
-export SUB_DOMAIN
-export COOKIES_RANDOM1
-export COOKIES_RANDOM2
-export SUPERADMIN_USERNAME
-export SUPERADMIN_PASSWORD
-
 # Save variables to file
 cat > /opt/remnawave/install_vars.sh <<EOL
 export PANEL_DOMAIN="$PANEL_DOMAIN"
 export SUB_DOMAIN="$SUB_DOMAIN"
+export SELFSTEAL_DOMAIN="$SELFSTEAL_DOMAIN"
 export COOKIES_RANDOM1="$COOKIES_RANDOM1"
 export COOKIES_RANDOM2="$COOKIES_RANDOM2"
 export SUPERADMIN_USERNAME="$SUPERADMIN_USERNAME"
@@ -334,18 +521,16 @@ export SUPERADMIN_PASSWORD="$SUPERADMIN_PASSWORD"
 EOL
 
 chmod 600 /opt/remnawave/install_vars.sh
+chmod 600 /opt/remnawave/credentials.txt
 
-print_success "Installation variables saved to install_vars.sh"
+print_success "Installation variables saved"
 
 # Display credentials prominently
 echo -e "\n========================================="
-echo "IMPORTANT: SAVE THESE CREDENTIALS"
+echo -e "${YELLOW}ВАЖНО: СОХРАНИТЕ ЭТИ ДАННЫЕ${NC}"
 echo "========================================="
 cat credentials.txt
 echo "========================================="
-print_success "Credentials generated and saved to credentials.txt"
-
-# Check created files
-ls -la /opt/remnawave/
 
 print_success "Configuration files setup completed successfully!"
+print_warning "Next step: run run-main.sh to start services"
