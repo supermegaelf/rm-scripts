@@ -338,8 +338,34 @@ https://remna.st/docs
 ========================================
 EOL
 
-cp /opt/remnawave/panel_access.txt /opt/remnawave/FINAL_INFO.txt
-echo -e "\n\nInstallation completed: $(date)" >> /opt/remnawave/FINAL_INFO.txt
+# Create FINAL_INFO.txt with installation summary
+cat > /opt/remnawave/FINAL_INFO.txt <<EOL
+========================================
+REMNAWAVE INSTALLATION SUMMARY
+========================================
+Installation completed: $(date)
+
+PANEL ACCESS:
+- URL: https://$PANEL_DOMAIN/auth/login?${COOKIES_RANDOM1}=${COOKIES_RANDOM2}
+- Login: $SUPERADMIN_USERNAME
+- Password: see file /opt/remnawave/credentials.txt
+
+SUBSCRIPTION PAGE:
+- URL: https://$SUB_DOMAIN
+
+MANAGEMENT:
+- Start/Stop: remnawave-manage {start|stop|restart}
+- Logs: remnawave-manage logs
+- Update: remnawave-manage update
+- Backup: /opt/remnawave/backup.sh
+
+IMPORTANT FILES:
+- Configuration: /opt/remnawave/
+- Credentials: /opt/remnawave/credentials.txt
+- Logs: docker compose logs -f
+- Backup: /opt/remnawave/backups/
+========================================
+EOL
 
 # Cleanup and security
 chmod 600 /opt/remnawave/.env
