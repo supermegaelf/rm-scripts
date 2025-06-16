@@ -58,6 +58,41 @@ fi
 
 print_success "Token loaded successfully"
 
+# Test token validity and refresh if needed
+echo "Testing token validity..."
+TEST_RESPONSE=$(curl -s -X GET "http://127.0.0.1:3000/api/system/health" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Host: $PANEL_DOMAIN" \
+    -H "X-Forwarded-For: 127.0.0.1" \
+    -H "X-Forwarded-Proto: https")
+
+if echo "$TEST_RESPONSE" | grep -q "Unauthorized"; then
+    echo "Token expired, getting new token..."
+    
+    LOGIN_RESPONSE=$(curl -s -X POST "http://127.0.0.1:3000/api/auth/login" \
+        -H "Content-Type: application/json" \
+        -H "Host: $PANEL_DOMAIN" \
+        -H "X-Forwarded-For: 127.0.0.1" \
+        -H "X-Forwarded-Proto: https" \
+        -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
+    
+    NEW_TOKEN=$(echo "$LOGIN_RESPONSE" | jq -r '.response.accessToken')
+    
+    if [ -z "$NEW_TOKEN" ] || [ "$NEW_TOKEN" == "null" ]; then
+        print_error "Failed to get new token!"
+        echo "Response: $LOGIN_RESPONSE"
+        exit 1
+    fi
+    
+    TOKEN="$NEW_TOKEN"
+    echo "$TOKEN" > /opt/remnawave/admin_token.txt
+    chmod 600 /opt/remnawave/admin_token.txt
+    
+    print_success "New token obtained successfully"
+else
+    print_success "Token is valid"
+fi
+
 # Generate X25519 keys for Reality
 echo "Generating x25519 keys..."
 
@@ -82,7 +117,7 @@ EOL
 chmod 600 /opt/remnawave/xray_keys.txt
 
 # Prompt for selfsteal domain
-print_input "Enter selfsteal domain for the node (e.g., example.com): "
+print_input "Enter selfsteal domain for the node (e.g., node.example.com): "
 read SELFSTEAL_DOMAIN
 
 if [[ -z "$SELFSTEAL_DOMAIN" ]]; then
