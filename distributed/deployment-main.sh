@@ -189,6 +189,14 @@ else
     exit 1
 fi
 
+# Verify token was saved
+if [[ -f "/opt/remnawave/admin_token.txt" ]] && [[ -s "/opt/remnawave/admin_token.txt" ]]; then
+    print_success "Admin token saved successfully"
+else
+    print_error "Failed to save admin token"
+    exit 1
+fi
+
 # Get public key
 echo "Getting public key for nodes..."
 
