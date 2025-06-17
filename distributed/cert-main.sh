@@ -63,16 +63,14 @@ check_status "Directory structure creation"
 
 print_status "Step 2: Testing Cloudflare API connectivity..."
 if [[ $CLOUDFLARE_API_KEY =~ [A-Z] ]]; then
-    print_status "Using API Token authentication"
     api_response=$(curl --silent --request GET --url https://api.cloudflare.com/client/v4/zones --header "Authorization: Bearer ${CLOUDFLARE_API_KEY}" --header "Content-Type: application/json")
 else
-    print_status "Using Global API Key authentication"
     api_response=$(curl --silent --request GET --url https://api.cloudflare.com/client/v4/zones --header "X-Auth-Key: ${CLOUDFLARE_API_KEY}" --header "X-Auth-Email: ${CLOUDFLARE_EMAIL}" --header "Content-Type: application/json")
 fi
 
 # Check if API response is successful
 if echo "$api_response" | grep -q '"success":true'; then
-    print_success "Cloudflare API connection successful"
+    check_status "Cloudflare API connection test"
 else
     print_error "Cloudflare API connection failed"
     echo -e "${RED}API Response:${NC} $api_response"
@@ -99,11 +97,9 @@ check_status "Cloudflare credentials file creation"
 print_status "Step 4: Extracting base domains..."
 PANEL_BASE_DOMAIN=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
 SUB_BASE_DOMAIN=$(echo "$SUB_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
+check_status "Base domain extraction"
 
-print_status "Panel base domain: $PANEL_BASE_DOMAIN"
-print_status "Sub base domain: $SUB_BASE_DOMAIN"
-
-# Check if certificates already exist
+# Function to check if certificate exists
 check_cert_exists() {
     local domain="$1"
     if [ -d "/etc/letsencrypt/live/$domain" ] && [ -f "/etc/letsencrypt/live/$domain/fullchain.pem" ]; then
@@ -113,13 +109,12 @@ check_cert_exists() {
     fi
 }
 
-print_status "Step 5: Checking existing certificates..."
+print_status "Step 5: Generating SSL certificates..."
 
-# Check panel certificate
+# Generate panel certificate
 if check_cert_exists "$PANEL_BASE_DOMAIN"; then
-    print_warning "Certificate for $PANEL_BASE_DOMAIN already exists, skipping..."
+    print_warning "Certificate for $PANEL_BASE_DOMAIN already exists, skipping generation"
 else
-    print_status "Generating certificate for $PANEL_BASE_DOMAIN..."
     certbot certonly \
         --dns-cloudflare \
         --dns-cloudflare-credentials ~/.secrets/certbot/cloudflare.ini \
@@ -134,11 +129,10 @@ else
     check_status "Panel certificate generation"
 fi
 
-# Check sub certificate
+# Generate sub certificate
 if check_cert_exists "$SUB_BASE_DOMAIN"; then
-    print_warning "Certificate for $SUB_BASE_DOMAIN already exists, skipping..."
+    print_warning "Certificate for $SUB_BASE_DOMAIN already exists, skipping generation"
 else
-    print_status "Generating certificate for $SUB_BASE_DOMAIN..."
     certbot certonly \
         --dns-cloudflare \
         --dns-cloudflare-credentials ~/.secrets/certbot/cloudflare.ini \
@@ -155,55 +149,24 @@ fi
 
 print_status "Step 6: Configuring certificate renewal..."
 
-# Add renewal hooks only if certificates were generated or if config doesn't exist
+# Configure renewal hooks
 if [ -f "/etc/letsencrypt/renewal/$PANEL_BASE_DOMAIN.conf" ]; then
     if ! grep -q "renew_hook" "/etc/letsencrypt/renewal/$PANEL_BASE_DOMAIN.conf"; then
         echo "renew_hook = sh -c 'cd /opt/remnawave && docker compose down remnawave-nginx && docker compose up -d remnawave-nginx'" >> /etc/letsencrypt/renewal/$PANEL_BASE_DOMAIN.conf
-        print_success "Added renewal hook for $PANEL_BASE_DOMAIN"
-    else
-        print_warning "Renewal hook for $PANEL_BASE_DOMAIN already exists"
     fi
 fi
 
 if [ -f "/etc/letsencrypt/renewal/$SUB_BASE_DOMAIN.conf" ]; then
     if ! grep -q "renew_hook" "/etc/letsencrypt/renewal/$SUB_BASE_DOMAIN.conf"; then
         echo "renew_hook = sh -c 'cd /opt/remnawave && docker compose down remnawave-nginx && docker compose up -d remnawave-nginx'" >> /etc/letsencrypt/renewal/$SUB_BASE_DOMAIN.conf
-        print_success "Added renewal hook for $SUB_BASE_DOMAIN"
-    else
-        print_warning "Renewal hook for $SUB_BASE_DOMAIN already exists"
     fi
 fi
 
-# Add cron job for certificate renewal
+# Add renewal cron job
 if ! crontab -u root -l 2>/dev/null | grep -q "certbot renew"; then
     (crontab -u root -l 2>/dev/null; echo "0 5 1 */2 * /usr/bin/certbot renew --quiet >> /usr/local/remnawave_reverse/cron_jobs.log 2>&1") | crontab -u root -
-    check_status "Certificate renewal cron job setup"
-else
-    print_warning "Certificate renewal cron job already exists"
 fi
+check_status "Certificate renewal configuration"
 
 echo
 echo -e "${GREEN}=== Certificate Setup Complete! ===${NC}"
-echo -e "${YELLOW}Summary:${NC}"
-echo -e "${GREEN}✓${NC} Directory structure created: /opt/remnawave"
-echo -e "${GREEN}✓${NC} Cloudflare API connectivity verified"
-echo -e "${GREEN}✓${NC} Cloudflare credentials configured"
-echo -e "${GREEN}✓${NC} Base domains extracted:"
-echo -e "  • Panel: $PANEL_BASE_DOMAIN"
-echo -e "  • Sub: $SUB_BASE_DOMAIN"
-
-# Check certificate status
-if check_cert_exists "$PANEL_BASE_DOMAIN"; then
-    echo -e "${GREEN}✓${NC} Panel certificate: Available"
-else
-    echo -e "${RED}✗${NC} Panel certificate: Failed"
-fi
-
-if check_cert_exists "$SUB_BASE_DOMAIN"; then
-    echo -e "${GREEN}✓${NC} Sub certificate: Available"
-else
-    echo -e "${RED}✗${NC} Sub certificate: Failed"
-fi
-
-echo
-echo -e "${GREEN}=== Certificates Setup Complete! ===${NC}"
