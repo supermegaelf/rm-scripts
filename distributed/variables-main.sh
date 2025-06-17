@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# Цвета для вывода
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}=== Настройка Remnawave ===${NC}"
-echo -e "${YELLOW}Введите необходимые параметры:${NC}"
+echo -e "${BLUE}=== Remnawave Setup ===${NC}"
+echo -e "${YELLOW}Enter required parameters:${NC}"
 echo
 
-# Функция для запроса ввода с валидацией
+# Function to request input with validation
 ask_input() {
     local prompt="$1"
     local var_name="$2"
@@ -21,24 +21,24 @@ ask_input() {
         echo -e -n "${GREEN}$prompt: ${NC}"
         read -r value
         if [ -z "$value" ]; then
-            echo -e "${RED}Значение не может быть пустым!${NC}"
+            echo -e "${RED}Value cannot be empty!${NC}"
         fi
     done
     
     eval "$var_name='$value'"
 }
 
-# Запрос параметров
-ask_input "PANEL_DOMAIN (например: example.com)" PANEL_DOMAIN
-ask_input "SUB_DOMAIN (например: example.com)" SUB_DOMAIN  
-ask_input "SELFSTEAL_DOMAIN (например: example.com)" SELFSTEAL_DOMAIN
-ask_input "CLOUDFLARE_EMAIL" CLOUDFLARE_EMAIL
+# Request parameters
+ask_input "PANEL_DOMAIN (e.g: example.com)" PANEL_DOMAIN
+ask_input "SUB_DOMAIN (e.g: example.com)" SUB_DOMAIN  
+ask_input "SELFSTEAL_DOMAIN (e.g: example.com)" SELFSTEAL_DOMAIN
 ask_input "CLOUDFLARE_API_KEY" CLOUDFLARE_API_KEY
+ask_input "CLOUDFLARE_EMAIL" CLOUDFLARE_EMAIL
 
 echo
-echo -e "${YELLOW}Генерирую файл с переменными окружения...${NC}"
+echo -e "${YELLOW}Generating environment variables file...${NC}"
 
-# Создание файла с переменными
+# Create variables file
 cat > remnawave-vars.sh << EOF
 # remnawave-vars.sh
 export PANEL_DOMAIN="$PANEL_DOMAIN"
@@ -47,10 +47,10 @@ export SELFSTEAL_DOMAIN="$SELFSTEAL_DOMAIN"
 export CLOUDFLARE_API_KEY="$CLOUDFLARE_API_KEY"
 export CLOUDFLARE_EMAIL="$CLOUDFLARE_EMAIL"
 
-# Генерируемые переменные
+# Generated variables
 export SUPERADMIN_USERNAME=\$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
 
-# Правильная генерация пароля
+# Proper password generation
 password=""
 password+=\$(head /dev/urandom | tr -dc 'A-Z' | head -c 1)
 password+=\$(head /dev/urandom | tr -dc 'a-z' | head -c 1)
@@ -67,14 +67,14 @@ export JWT_AUTH_SECRET=\$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c
 export JWT_API_TOKENS_SECRET=\$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 64)
 EOF
 
-# Делаем файл исполняемым
+# Make file executable
 chmod +x remnawave-vars.sh
 
-echo -e "${GREEN}✓ Файл remnawave-vars.sh создан успешно!${NC}"
+echo -e "${GREEN}✓ File remnawave-vars.sh created successfully!${NC}"
 echo
-echo -e "${YELLOW}Загружаю переменные окружения...${NC}"
+echo -e "${YELLOW}Loading environment variables...${NC}"
 
-# Загружаем переменные окружения
+# Load environment variables
 source remnawave-vars.sh
 
-echo -e "${GREEN}✓ Переменные окружения загружены!${NC}"
+echo -e "${GREEN}✓ Environment variables loaded!${NC}"
