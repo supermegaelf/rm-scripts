@@ -1268,10 +1268,29 @@ restart_containers() {
     
     cd /opt/remnawave
     docker compose down
-    sleep 1
-    docker compose up -d && docker compose logs -f &
+    sleep 2
     
-    log "Containers restarted successfully"
+    log "Starting containers in background..."
+    if docker compose up -d; then
+        log "Containers started successfully in background"
+        
+        # Brief wait to ensure services are starting
+        sleep 5
+        
+        # Show container status
+        log "Container status:"
+        docker compose ps
+        
+        # Check if containers are running
+        if docker compose ps | grep -q "Up"; then
+            log "✅ All containers are running"
+        else
+            warning "Some containers may not be running properly"
+            log "You can check logs with: cd /opt/remnawave && docker compose logs -f"
+        fi
+    else
+        error "Failed to restart containers"
+    fi
 }
 
 # Function to setup aliases
@@ -1326,8 +1345,10 @@ EOF
     
     echo -e "${YELLOW}🔧 MANAGEMENT COMMANDS:${NC}"
     echo "================================================="
-    echo "Restart Remnawave:     cd /opt/remnawave && docker compose restart"
     echo "View logs:             cd /opt/remnawave && docker compose logs -f"
+    echo "Restart services:      cd /opt/remnawave && docker compose restart"
+    echo "Stop services:         cd /opt/remnawave && docker compose down"
+    echo "Start services:        cd /opt/remnawave && docker compose up -d"
     echo "Quick manager:         remnawave_reverse"
     echo "Quick alias:           rr"
     echo ""
@@ -1340,47 +1361,107 @@ EOF
     echo "SSL certificates:      /etc/letsencrypt/live/"
     echo ""
     
-    echo -e "${YELLOW}🔒 SECURITY RECOMMENDATIONS:${NC}"
+    # Check services status
+    echo -e "${YELLOW}📊 SERVICES STATUS:${NC}"
+    echo "================================================="
+    cd /opt/remnawave
+    
+    if docker compose ps | grep -q "remnawave.*Up"; then
+        echo "Remnawave Panel: ✅ Running"
+    else
+        echo "Remnawave Panel: ❌ Not running"
+    fi
+    
+    if docker compose ps | grep -q "remnawave-db.*Up"; then
+        echo "Database: ✅ Running"
+    else
+        echo "Database: ❌ Not running"
+    fi
+    
+    if docker compose ps | grep -q "remnawave-redis.*Up"; then
+        echo "Redis: ✅ Running"
+    else
+        echo "Redis: ❌ Not running"
+    fi
+    
+    if docker compose ps | grep -q "remnawave-nginx.*Up"; then
+        echo "Nginx: ✅ Running"
+    else
+        echo "Nginx: ❌ Not running"
+    fi
+    
+    if docker compose ps | grep -q "remnawave-subscription-page.*Up"; then
+        echo "Subscription Page: ✅ Running"
+    else
+        echo "Subscription Page: ❌ Not running"
+    fi
+    echo ""
+    
+    # Check certificate status
+    echo -e "${YELLOW}🔒 CERTIFICATE STATUS:${NC}"
+    echo "================================================="
+    PANEL_BASE_DOMAIN=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
+    SUB_BASE_DOMAIN=$(echo "$SUB_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
+    
+    if check_existing_certificates "$PANEL_BASE_DOMAIN"; then
+        cert_expiry=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$PANEL_BASE_DOMAIN/fullchain.pem" | cut -d= -f2 | cut -d' ' -f1-3)
+        echo "Panel certificate: ✅ Valid until $cert_expiry"
+    else
+        echo "Panel certificate: ❌ Not found"
+    fi
+    
+    if [[ "$SUB_BASE_DOMAIN" != "$PANEL_BASE_DOMAIN" ]] && check_existing_certificates "$SUB_BASE_DOMAIN"; then
+        cert_expiry=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$SUB_BASE_DOMAIN/fullchain.pem" | cut -d= -f2 | cut -d' ' -f1-3)
+        echo "Subscription certificate: ✅ Valid until $cert_expiry"
+    fi
+    echo ""
+    
+    echo -e "${YELLOW}🛡️ SECURITY RECOMMENDATIONS:${NC}"
     echo "================================================="
     echo "1. 💾 Save these credentials in a secure password manager"
     echo "2. 🔑 Configure SSH key authentication (recommended)"
     echo "3. 🚪 Change SSH port from default 22"
     echo "4. 🔄 Regularly update your system: apt update && apt upgrade"
     echo "5. 📊 Monitor logs for suspicious activity"
-    echo "6. 💰 Setup automated backups of /opt/remnawave/ directory"
-    echo ""
-    
-    # Check certificate status
-    echo -e "${YELLOW}📋 CERTIFICATE STATUS:${NC}"
-    echo "================================================="
-    PANEL_BASE_DOMAIN=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
-    SUB_BASE_DOMAIN=$(echo "$SUB_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
-    
-    if check_existing_certificates "$PANEL_BASE_DOMAIN"; then
-        cert_expiry=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$PANEL_BASE_DOMAIN/fullchain.pem" | cut -d= -f2)
-        echo "Panel certificate: ✅ Valid until $cert_expiry"
-    fi
-    
-    if [[ "$SUB_BASE_DOMAIN" != "$PANEL_BASE_DOMAIN" ]] && check_existing_certificates "$SUB_BASE_DOMAIN"; then
-        cert_expiry=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/$SUB_BASE_DOMAIN/fullchain.pem" | cut -d= -f2)
-        echo "Subscription certificate: ✅ Valid until $cert_expiry"
-    fi
+    echo "6. 💾 Setup automated backups of /opt/remnawave/ directory"
     echo ""
     
     echo -e "${YELLOW}🌐 NEXT STEPS:${NC}"
     echo "================================================="
     echo "1. 🔗 Access your panel using the URL above"
-    echo "2. 🛡️ Run SSH security script: bash <(curl -s your-domain.com/ssh-security.sh)"
-    echo "3. 🌍 Install WARP proxy: bash <(curl -s your-domain.com/warp-install.sh)"
+    echo "2. 🛡️ Run SSH security script for better security"
+    echo "3. 🌍 Install WARP proxy for bypassing restrictions"
     echo "4. 👥 Create user accounts in the panel"
     echo "5. 📱 Generate subscription links for clients"
     echo ""
     
-    echo -e "${RED}⚠️  IMPORTANT SECURITY WARNING:${NC}"
+    echo -e "${YELLOW}📋 USEFUL COMMANDS:${NC}"
+    echo "================================================="
+    echo "Check logs:            cd /opt/remnawave && docker compose logs"
+    echo "Follow logs:           cd /opt/remnawave && docker compose logs -f"
+    echo "Container status:      cd /opt/remnawave && docker compose ps"
+    echo "Restart all:           cd /opt/remnawave && docker compose restart"
+    echo "Update images:         cd /opt/remnawave && docker compose pull && docker compose up -d"
+    echo ""
+    
+    echo -e "${RED}⚠️  IMPORTANT NOTES:${NC}"
     echo "================================================="
     echo "🔴 SAVE YOUR CREDENTIALS NOW - They won't be shown again!"
     echo "🔴 Test the panel access before closing this terminal!"
-    echo "🔴 Configure SSH security immediately!"
+    echo "🔴 Services are running in background - check logs if needed!"
+    echo "🔴 Configure additional security measures!"
+    echo ""
+    
+    # Final status check
+    log "Performing final connectivity test..."
+    if curl -s --connect-timeout 5 "http://127.0.0.1:3000/api/auth/register" \
+        --header 'X-Forwarded-For: 127.0.0.1' \
+        --header 'X-Forwarded-Proto: https' > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ Panel is responding on localhost${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Panel may still be starting up - wait a moment and try accessing${NC}"
+        echo -e "${BLUE}💡 If issues persist, check logs: cd /opt/remnawave && docker compose logs -f${NC}"
+    fi
     echo ""
     
     # Wait for user confirmation
@@ -1389,6 +1470,7 @@ EOF
     
     echo -e "${BLUE}🎊 Installation completed successfully!${NC}"
     echo "📞 For support, check the documentation or community forums."
+    echo "🔍 Logs are available in background: cd /opt/remnawave && docker compose logs -f"
     echo ""
 }echo "Username: $SUPERADMIN_USERNAME"
     echo "Password: $SUPERADMIN_PASSWORD"
