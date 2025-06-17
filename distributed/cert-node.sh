@@ -44,6 +44,17 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Check if variables file exists and load it
+if [ -f "node-vars.sh" ]; then
+    print_status "Loading environment variables from node-vars.sh..."
+    source node-vars.sh
+    check_status "Environment variables loading"
+elif [ -f "/opt/remnawave/node-vars.sh" ]; then
+    print_status "Loading environment variables from /opt/remnawave/node-vars.sh..."
+    source /opt/remnawave/node-vars.sh
+    check_status "Environment variables loading"
+fi
+
 # Check if required environment variables are set
 if [ -z "$SELFSTEAL_DOMAIN" ] || [ -z "$CLOUDFLARE_API_KEY" ] || [ -z "$CLOUDFLARE_EMAIL" ]; then
     print_error "Required environment variables are not set!"
@@ -52,7 +63,9 @@ if [ -z "$SELFSTEAL_DOMAIN" ] || [ -z "$CLOUDFLARE_API_KEY" ] || [ -z "$CLOUDFLA
     echo -e "• CLOUDFLARE_API_KEY"
     echo -e "• CLOUDFLARE_EMAIL"
     echo
-    echo -e "${YELLOW}Run the node variables setup script first or source your variables file${NC}"
+    echo -e "${YELLOW}Solutions:${NC}"
+    echo -e "1. Run: source node-vars.sh && sudo -E ./cert-node.sh"
+    echo -e "2. Or place node-vars.sh in the same directory as this script"
     exit 1
 fi
 
