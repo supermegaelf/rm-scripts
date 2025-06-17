@@ -44,6 +44,17 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Check if variables file exists and load it
+if [ -f "remnawave-vars.sh" ]; then
+    print_status "Loading environment variables from remnawave-vars.sh..."
+    source remnawave-vars.sh
+    check_status "Environment variables loading"
+elif [ -f "/opt/remnawave/remnawave-vars.sh" ]; then
+    print_status "Loading environment variables from /opt/remnawave/remnawave-vars.sh..."
+    source /opt/remnawave/remnawave-vars.sh
+    check_status "Environment variables loading"
+fi
+
 # Check if required environment variables are set
 if [ -z "$PANEL_DOMAIN" ] || [ -z "$SUB_DOMAIN" ] || [ -z "$CLOUDFLARE_API_KEY" ] || [ -z "$CLOUDFLARE_EMAIL" ]; then
     print_error "Required environment variables are not set!"
@@ -53,7 +64,9 @@ if [ -z "$PANEL_DOMAIN" ] || [ -z "$SUB_DOMAIN" ] || [ -z "$CLOUDFLARE_API_KEY" 
     echo -e "• CLOUDFLARE_API_KEY"
     echo -e "• CLOUDFLARE_EMAIL"
     echo
-    echo -e "${YELLOW}Run the variables setup script first or source your variables file${NC}"
+    echo -e "${YELLOW}Solutions:${NC}"
+    echo -e "1. Run: source remnawave-vars.sh && sudo -E ./cert-main.sh"
+    echo -e "2. Or place remnawave-vars.sh in the same directory as this script"
     exit 1
 fi
 
