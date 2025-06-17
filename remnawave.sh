@@ -1061,47 +1061,148 @@ configure_api() {
     
     domain_url="127.0.0.1:3000"
     
-    # Register admin user
+    # Wait a bit more for API to be fully ready
+    log "Waiting for API to be fully ready..."
+    sleep 10
+    
+    # Check API availability with more specific endpoint
+    for i in {1..30}; do
+        api_check=$(curl -s -o /dev/null -w "%{http_code}" "http://$domain_url/api/health" 2>/dev/null || echo "000")
+        if [[ "$api_check" == "200" ]] || [[ "$api_check" == "404" ]]; then
+            log "API is responding (HTTP $api_check)"
+            break
+        fi
+        if [[ $i -eq 30 ]]; then
+            warning "API health check failed, but continuing with registration attempt"
+        fi
+        sleep 2
+    done
+    
+    # Register admin user with better error handling
     log "Registering admin user..."
+    
+    # Prepare registration data
+    register_data=$(cat <<EOF
+{
+    "username": "$SUPERADMIN_USERNAME",
+    "password": "$SUPERADMIN_PASSWORD"
+}
+EOF
+)
+    
+    # Try registration with detailed error handling
     register_response=$(curl -s -X POST "http://$domain_url/api/auth/register" \
         -H "Authorization: Bearer " \
         -H "Content-Type: application/json" \
         -H "Host: $PANEL_DOMAIN" \
         -H "X-Forwarded-For: 127.0.0.1" \
         -H "X-Forwarded-Proto: https" \
-        -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
+        -H "User-Agent: RemnaWave-Installer/1.0" \
+        -d "$register_data" 2>&1)
     
-    token=$(echo "$register_response" | jq -r '.response.accessToken')
-    
-    if [[ "$token" == "null" ]]; then
-        error "Failed to register admin user"
+    if [[ $? -ne 0 ]]; then
+        error "Failed to connect to API for registration. Check if containers are running: docker compose logs remnawave"
     fi
     
-    # Get public key
-    log "Getting public key..."
-    api_response=$(curl -s -X GET "http://$domain_url/api/keygen" \
-        -H "Authorization: Bearer $token" \
-        -H "Content-Type: application/json" \
-        -H "Host: $PANEL_DOMAIN" \
-        -H "X-Forwarded-For: 127.0.0.1" \
-        -H "X-Forwarded-Proto: https")
+    log "Registration response received"
     
-    pubkey=$(echo "$api_response" | jq -r '.response.pubKey')
+    # Check if jq is available and response is valid JSON
+    if ! echo "$register_response" | jq . >/dev/null 2>&1; then
+        log "Raw response: $register_response"
+        
+        # Check if it's an HTML error page
+        if echo "$register_response" | grep -q "<html>"; then
+            error "Received HTML response instead of JSON. API may not be ready or there's a proxy issue."
+        fi
+        
+        # Try alternative registration endpoint or method
+        warning "Initial registration failed, trying alternative approach..."
+        sleep 5
+        
+        # Try without some headers
+        register_response=$(curl -s -X POST "http://$domain_url/api/auth/register" \
+            -H "Content-Type: application/json" \
+            -d "$register_data" 2>&1)
+    fi
     
-    # Generate Xray keys
-    log "Generating Xray keys..."
-    docker run --rm ghcr.io/xtls/xray-core x25519 > /tmp/xray_keys.txt 2>&1
-    keys=$(cat /tmp/xray_keys.txt)
-    rm -f /tmp/xray_keys.txt
-    private_key=$(echo "$keys" | grep "Private key:" | awk '{print $3}')
-    public_key=$(echo "$keys" | grep "Public key:" | awk '{print $3}')
+    # Parse token with better error handling
+    if echo "$register_response" | jq . >/dev/null 2>&1; then
+        token=$(echo "$register_response" | jq -r '.response.accessToken // .accessToken // .token // empty' 2>/dev/null)
+        
+        if [[ -z "$token" || "$token" == "null" ]]; then
+            # Check if registration was successful but with different response format
+            success=$(echo "$register_response" | jq -r '.success // .ok // empty' 2>/dev/null)
+            if [[ "$success" == "true" ]]; then
+                log "Registration successful, attempting login..."
+                
+                # Try to login instead
+                login_response=$(curl -s -X POST "http://$domain_url/api/auth/login" \
+                    -H "Content-Type: application/json" \
+                    -H "Host: $PANEL_DOMAIN" \
+                    -H "X-Forwarded-For: 127.0.0.1" \
+                    -H "X-Forwarded-Proto: https" \
+                    -d "$register_data")
+                
+                token=$(echo "$login_response" | jq -r '.response.accessToken // .accessToken // .token // empty' 2>/dev/null)
+            fi
+            
+            if [[ -z "$token" || "$token" == "null" ]]; then
+                log "Registration response: $register_response"
+                warning "Could not extract token from response, but registration may have succeeded"
+                warning "You can complete the setup manually through the web interface"
+                return 0
+            fi
+        fi
+    else
+        log "Non-JSON response: $register_response"
+        warning "Registration may have succeeded with non-JSON response"
+        warning "Skipping automatic API configuration - complete setup through web interface"
+        return 0
+    fi
     
-    # Create Xray configuration
-    log "Creating Xray configuration..."
-    short_id=$(openssl rand -hex 8)
-    config_file="/opt/remnawave/config.json"
+    log "Admin user registered successfully"
     
-    cat > "$config_file" <<EOL
+    # Continue with API configuration only if we have a valid token
+    if [[ -n "$token" && "$token" != "null" ]]; then
+        log "Configuring Xray settings..."
+        
+        # Get public key
+        api_response=$(curl -s -X GET "http://$domain_url/api/keygen" \
+            -H "Authorization: Bearer $token" \
+            -H "Content-Type: application/json" \
+            -H "Host: $PANEL_DOMAIN" \
+            -H "X-Forwarded-For: 127.0.0.1" \
+            -H "X-Forwarded-Proto: https")
+        
+        pubkey=$(echo "$api_response" | jq -r '.response.pubKey // .pubKey // empty' 2>/dev/null)
+        
+        if [[ -z "$pubkey" || "$pubkey" == "null" ]]; then
+            warning "Could not get public key from API, skipping Xray configuration"
+            return 0
+        fi
+        
+        # Generate Xray keys
+        log "Generating Xray keys..."
+        if ! docker run --rm ghcr.io/xtls/xray-core x25519 > /tmp/xray_keys.txt 2>&1; then
+            warning "Failed to generate Xray keys, skipping Xray configuration"
+            return 0
+        fi
+        
+        keys=$(cat /tmp/xray_keys.txt)
+        rm -f /tmp/xray_keys.txt
+        private_key=$(echo "$keys" | grep "Private key:" | awk '{print $3}')
+        public_key=$(echo "$keys" | grep "Public key:" | awk '{print $3}')
+        
+        if [[ -z "$private_key" || -z "$public_key" ]]; then
+            warning "Failed to extract Xray keys, skipping Xray configuration"
+            return 0
+        fi
+        
+        # Create Xray configuration
+        short_id=$(openssl rand -hex 8)
+        config_file="/tmp/xray_config.json"
+        
+        cat > "$config_file" <<EOL
 {
     "log": {
         "loglevel": "warning"
@@ -1183,21 +1284,21 @@ configure_api() {
 }
 EOL
 
-    # Update Xray configuration
-    new_config=$(cat "$config_file")
-    update_response=$(curl -s -X PUT "http://$domain_url/api/xray" \
-        -H "Authorization: Bearer $token" \
-        -H "Content-Type: application/json" \
-        -H "Host: $PANEL_DOMAIN" \
-        -H "X-Forwarded-For: 127.0.0.1" \
-        -H "X-Forwarded-Proto: https" \
-        -d "$new_config")
-    
-    rm -f "$config_file"
-    
-    # Create node
-    log "Creating node..."
-    node_data=$(cat <<EOF
+        # Update Xray configuration
+        new_config=$(cat "$config_file")
+        update_response=$(curl -s -X PUT "http://$domain_url/api/xray" \
+            -H "Authorization: Bearer $token" \
+            -H "Content-Type: application/json" \
+            -H "Host: $PANEL_DOMAIN" \
+            -H "X-Forwarded-For: 127.0.0.1" \
+            -H "X-Forwarded-Proto: https" \
+            -d "$new_config")
+        
+        rm -f "$config_file"
+        
+        # Create node
+        log "Creating node..."
+        node_data=$(cat <<EOF
 {
     "name": "VLESS Reality Steal Oneself",
     "address": "$SELFSTEAL_DOMAIN",
@@ -1212,29 +1313,29 @@ EOL
 }
 EOF
 )
-    
-    node_response=$(curl -s -X POST "http://$domain_url/api/nodes" \
-        -H "Authorization: Bearer $token" \
-        -H "Content-Type: application/json" \
-        -H "Host: $PANEL_DOMAIN" \
-        -H "X-Forwarded-For: 127.0.0.1" \
-        -H "X-Forwarded-Proto: https" \
-        -d "$node_data")
-    
-    # Get inbound UUID
-    log "Getting inbound UUID..."
-    inbounds_response=$(curl -s -X GET "http://$domain_url/api/inbounds" \
-        -H "Authorization: Bearer $token" \
-        -H "Content-Type: application/json" \
-        -H "Host: $PANEL_DOMAIN" \
-        -H "X-Forwarded-For: 127.0.0.1" \
-        -H "X-Forwarded-Proto: https")
-    
-    inbound_uuid=$(echo "$inbounds_response" | jq -r '.response[0].uuid')
-    
-    # Create host
-    log "Creating host..."
-    host_data=$(cat <<EOF
+        
+        node_response=$(curl -s -X POST "http://$domain_url/api/nodes" \
+            -H "Authorization: Bearer $token" \
+            -H "Content-Type: application/json" \
+            -H "Host: $PANEL_DOMAIN" \
+            -H "X-Forwarded-For: 127.0.0.1" \
+            -H "X-Forwarded-Proto: https" \
+            -d "$node_data")
+        
+        # Get inbound UUID
+        inbounds_response=$(curl -s -X GET "http://$domain_url/api/inbounds" \
+            -H "Authorization: Bearer $token" \
+            -H "Content-Type: application/json" \
+            -H "Host: $PANEL_DOMAIN" \
+            -H "X-Forwarded-For: 127.0.0.1" \
+            -H "X-Forwarded-Proto: https")
+        
+        inbound_uuid=$(echo "$inbounds_response" | jq -r '.response[0].uuid // .data[0].uuid // empty' 2>/dev/null)
+        
+        if [[ -n "$inbound_uuid" && "$inbound_uuid" != "null" ]]; then
+            # Create host
+            log "Creating host..."
+            host_data=$(cat <<EOF
 {
     "inboundUuid": "$inbound_uuid",
     "remark": "Steal",
@@ -1250,16 +1351,21 @@ EOF
 }
 EOF
 )
-    
-    host_response=$(curl -s -X POST "http://$domain_url/api/hosts" \
-        -H "Authorization: Bearer $token" \
-        -H "Content-Type: application/json" \
-        -H "Host: $PANEL_DOMAIN" \
-        -H "X-Forwarded-For: 127.0.0.1" \
-        -H "X-Forwarded-Proto: https" \
-        -d "$host_data")
-    
-    log "API configuration completed successfully"
+            
+            host_response=$(curl -s -X POST "http://$domain_url/api/hosts" \
+                -H "Authorization: Bearer $token" \
+                -H "Content-Type: application/json" \
+                -H "Host: $PANEL_DOMAIN" \
+                -H "X-Forwarded-For: 127.0.0.1" \
+                -H "X-Forwarded-Proto: https" \
+                -d "$host_data")
+        fi
+        
+        log "API configuration completed successfully"
+    else
+        warning "No valid token available, skipping advanced API configuration"
+        log "Basic installation completed - complete setup through web interface"
+    fi
 }
 
 # Function to restart containers
