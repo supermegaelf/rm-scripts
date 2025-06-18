@@ -13,15 +13,6 @@ echo "Remnawave Nginx Setup and Container Startup"
 echo "========================================="
 echo
 
-# Load environment variables
-if [ -f "remnawave-vars.sh" ]; then
-    source remnawave-vars.sh
-else
-    echo "Error: remnawave-vars.sh not found!"
-    echo "Please run var-main.sh first."
-    exit 1
-fi
-
 # Create nginx.conf file
 echo "Creating nginx.conf file..."
 cat > /opt/remnawave/nginx.conf <<EOL
