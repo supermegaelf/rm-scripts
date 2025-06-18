@@ -11,6 +11,20 @@ echo -e "${BLUE}=== Remnawave Config Generator ===${NC}"
 echo -e "${YELLOW}Generating configuration files...${NC}"
 echo
 
+# Function to load variables from remnawave-vars.sh
+load_variables() {
+    echo -e "${YELLOW}Loading environment variables...${NC}"
+    
+    if [ -f "remnawave-vars.sh" ]; then
+        source remnawave-vars.sh
+        echo -e "${GREEN}✓ Variables loaded from remnawave-vars.sh${NC}"
+    else
+        echo -e "${RED}remnawave-vars.sh not found!${NC}"
+        echo -e "${YELLOW}Please run the setup script first to generate variables${NC}"
+        exit 1
+    fi
+}
+
 # Function to check if variables are set
 check_variables() {
     echo -e "${YELLOW}Checking required variables...${NC}"
@@ -321,6 +335,8 @@ download_index_html() {
 }
 
 # Main execution
+load_variables
+echo
 check_variables
 echo
 create_env_file
