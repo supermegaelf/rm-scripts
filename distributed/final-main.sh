@@ -13,15 +13,6 @@ echo "Remnawave Final Setup"
 echo "========================================="
 echo
 
-# Load environment variables
-if [ -f "remnawave-vars.sh" ]; then
-    source remnawave-vars.sh
-else
-    echo "Error: remnawave-vars.sh not found!"
-    echo "Please run var-main.sh first."
-    exit 1
-fi
-
 # Set API URL
 domain_url="127.0.0.1:3000"
 
@@ -112,17 +103,6 @@ docker compose down
 sleep 1
 docker compose up -d
 
-# Display results BEFORE logs
-echo
-echo "========================================="
-echo "Remnawave URL:"
-echo "https://${PANEL_DOMAIN}/auth/login?${cookies_random1}=${cookies_random2}"
-echo
-echo "Credentials:"
-echo "Username: $SUPERADMIN_USERNAME"
-echo "Password: $SUPERADMIN_PASSWORD"
-echo "========================================="
-
 # Install alias
 echo
 echo "Installing remnawave_reverse alias..."
@@ -135,9 +115,17 @@ bashrc_file="/etc/bash.bashrc"
 alias_line="alias rr='remnawave_reverse'"
 echo "$alias_line" >> "$bashrc_file"
 
+# Display results BEFORE logs
+echo
+echo "========================================="
+echo "Remnawave URL:"
+echo "https://${PANEL_DOMAIN}/auth/login?${cookies_random1}=${cookies_random2}"
+echo
+echo "Credentials:"
+echo "Username: $SUPERADMIN_USERNAME"
+echo "Password: $SUPERADMIN_PASSWORD"
+echo "========================================="
 echo
 echo "✓ Remnawave setup completed successfully!"
 echo
-echo "Containers restarted. Following logs (press Ctrl+C to exit)..."
-echo
-docker compose logs -f
+echo "To check logs, use: cd /opt/remnawave && docker compose logs -f"
