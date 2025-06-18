@@ -173,3 +173,4 @@ echo
 echo -e "${BLUE}Admin Credentials:${NC}"
 echo -e "${YELLOW}Username: $SUPERADMIN_USERNAME${NC}"
 echo -e "${YELLOW}Password: $SUPERADMIN_PASSWORD${NC}"
+echo
