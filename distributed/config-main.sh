@@ -10,19 +10,6 @@ echo "Remnawave Configuration Files Setup"
 echo "========================================="
 echo
 
-# Load environment variables
-if [ -f "remnawave-vars.sh" ]; then
-    source remnawave-vars.sh
-else
-    echo "Error: remnawave-vars.sh not found!"
-    echo "Please run var-main.sh first."
-    exit 1
-fi
-
-# Extract base domains
-PANEL_BASE_DOMAIN=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
-SUB_BASE_DOMAIN=$(echo "$SUB_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
-
 # Create .env file
 echo "Creating .env file..."
 cat > /opt/remnawave/.env <<EOL
