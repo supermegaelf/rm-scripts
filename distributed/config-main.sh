@@ -56,6 +56,13 @@ get_base_domain() {
     echo "$domain" | sed 's/^[^.]*\.//'
 }
 
+# Function to create directory
+create_directory() {
+    echo -e "${YELLOW}Creating /opt/remnawave directory...${NC}"
+    mkdir -p /opt/remnawave
+    echo -e "${GREEN}✓ Directory created${NC}"
+}
+
 # Function to create .env file
 create_env_file() {
     echo -e "${YELLOW}Creating .env file...${NC}"
@@ -63,7 +70,7 @@ create_env_file() {
     local panel_base_domain=$(get_base_domain "$PANEL_DOMAIN")
     local sub_base_domain=$(get_base_domain "$SUB_DOMAIN")
     
-    cat > .env <<EOL
+    cat > /opt/remnawave/.env <<EOL
 ### APP ###
 APP_PORT=3000
 METRICS_PORT=3001
@@ -164,7 +171,7 @@ POSTGRES_PASSWORD=postgres
 POSTGRES_DB=postgres
 EOL
 
-    echo -e "${GREEN}✓ .env file created successfully!${NC}"
+    echo -e "${GREEN}✓ .env file created in /opt/remnawave/${NC}"
 }
 
 # Function to create docker-compose.yml file
@@ -174,7 +181,7 @@ create_docker_compose() {
     local panel_base_domain=$(get_base_domain "$PANEL_DOMAIN")
     local sub_base_domain=$(get_base_domain "$SUB_DOMAIN")
     
-    cat > docker-compose.yml <<EOL
+    cat > /opt/remnawave/docker-compose.yml <<EOL
 services:
   remnawave-db:
     image: postgres:17
@@ -308,25 +315,16 @@ volumes:
     name: remnawave-redis-data
 EOL
 
-    echo -e "${GREEN}✓ docker-compose.yml file created successfully!${NC}"
+    echo -e "${GREEN}✓ docker-compose.yml file created in /opt/remnawave/${NC}"
 }
 
 # Function to download index.html
 download_index_html() {
     echo -e "${YELLOW}Downloading index.html...${NC}"
     
-    # Create directory if it doesn't exist
-    mkdir -p /opt/remnawave/
-    
     # Download index.html
     if wget -P /opt/remnawave/ https://raw.githubusercontent.com/supermegaelf/rm-pages/main/index.html >/dev/null 2>&1; then
-        echo -e "${GREEN}✓ index.html downloaded successfully!${NC}"
-        
-        # Copy to current directory if needed
-        if [ -f "/opt/remnawave/index.html" ]; then
-            cp /opt/remnawave/index.html ./
-            echo -e "${GREEN}✓ index.html copied to current directory${NC}"
-        fi
+        echo -e "${GREEN}✓ index.html downloaded to /opt/remnawave/${NC}"
     else
         echo -e "${RED}Failed to download index.html${NC}"
         echo -e "${YELLOW}You may need to download it manually from:${NC}"
@@ -339,10 +337,12 @@ load_variables
 echo
 check_variables
 echo
+create_directory
+echo
 create_env_file
 echo
 create_docker_compose
 echo
 download_index_html
 echo
-echo -e "${GREEN}✓ All configuration files created successfully!${NC}"
+echo -e "${GREEN}=== All configuration files created successfully! ===${NC}"
