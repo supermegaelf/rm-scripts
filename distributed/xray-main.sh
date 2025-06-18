@@ -1,44 +1,29 @@
 #!/bin/bash
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Remnawave registration and API configuration script
+# Section 6: Registration and configuration via API
 
-echo -e "${BLUE}=== Xray Configuration Setup ===${NC}"
+set -e
+
+echo "========================================="
+echo "Remnawave API Configuration"
+echo "========================================="
+echo
 
 # Load environment variables
 if [ -f "remnawave-vars.sh" ]; then
-    echo -e "${YELLOW}Loading existing environment variables...${NC}"
     source remnawave-vars.sh
-    echo -e "${GREEN}✓ Environment variables loaded${NC}"
 else
-    echo -e "${RED}Error: remnawave-vars.sh not found!${NC}"
-    echo -e "${YELLOW}Please run var-main.sh first${NC}"
+    echo "Error: remnawave-vars.sh not found!"
+    echo "Please run var-main.sh first."
     exit 1
 fi
 
-# Check required variables
-if [ -z "$PANEL_DOMAIN" ] || [ -z "$SELFSTEAL_DOMAIN" ] || [ -z "$SUPERADMIN_USERNAME" ] || [ -z "$SUPERADMIN_PASSWORD" ] || [ -z "$cookies_random1" ] || [ -z "$cookies_random2" ]; then
-    echo -e "${RED}Required variables are missing!${NC}"
-    exit 1
-fi
-
-# Check if jq is installed
-if ! command -v jq &> /dev/null; then
-    echo -e "${RED}jq is not installed!${NC}"
-    echo -e "${YELLOW}Installing jq...${NC}"
-    apt-get update && apt-get install -y jq
-fi
-
-# Set domain URL
+# Set API URL
 domain_url="127.0.0.1:3000"
 
 # Registration
-echo
-echo -e "${YELLOW}Registering admin user...${NC}"
+echo "Registering superadmin user..."
 register_response=$(curl -s -X POST "http://$domain_url/api/auth/register" \
     -H "Authorization: Bearer " \
     -H "Content-Type: application/json" \
@@ -47,19 +32,12 @@ register_response=$(curl -s -X POST "http://$domain_url/api/auth/register" \
     -H "X-Forwarded-Proto: https" \
     -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
 
+# Extract token
 token=$(echo "$register_response" | jq -r '.response.accessToken')
-
-if [ -z "$token" ] || [ "$token" = "null" ]; then
-    echo -e "${RED}Failed to register or get token!${NC}"
-    echo -e "${YELLOW}Response: $register_response${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✓ Admin user registered successfully${NC}"
 
 # Get public key
 echo
-echo -e "${YELLOW}Getting public key...${NC}"
+echo "Getting public key..."
 api_response=$(curl -s -X GET "http://$domain_url/api/keygen" \
     -H "Authorization: Bearer $token" \
     -H "Content-Type: application/json" \
@@ -67,35 +45,21 @@ api_response=$(curl -s -X GET "http://$domain_url/api/keygen" \
     -H "X-Forwarded-For: 127.0.0.1" \
     -H "X-Forwarded-Proto: https")
 
+# Extract public key
 pubkey=$(echo "$api_response" | jq -r '.response.pubKey')
-
-if [ -z "$pubkey" ] || [ "$pubkey" = "null" ]; then
-    echo -e "${RED}Failed to get public key!${NC}"
-    echo -e "${YELLOW}Response: $api_response${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✓ Public key obtained${NC}"
 
 # Generate Xray keys
 echo
-echo -e "${YELLOW}Generating Xray keys...${NC}"
+echo "Generating Xray keys..."
 docker run --rm ghcr.io/xtls/xray-core x25519 > /tmp/xray_keys.txt 2>&1
 keys=$(cat /tmp/xray_keys.txt)
 rm -f /tmp/xray_keys.txt
 private_key=$(echo "$keys" | grep "Private key:" | awk '{print $3}')
 public_key=$(echo "$keys" | grep "Public key:" | awk '{print $3}')
 
-if [ -z "$private_key" ] || [ -z "$public_key" ]; then
-    echo -e "${RED}Failed to generate Xray keys!${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✓ Xray keys generated${NC}"
-
 # Create Xray configuration
 echo
-echo -e "${YELLOW}Creating Xray configuration...${NC}"
+echo "Creating Xray configuration..."
 short_id=$(openssl rand -hex 8)
 config_file="/opt/remnawave/config.json"
 
@@ -181,11 +145,9 @@ cat > "$config_file" <<EOL
 }
 EOL
 
-echo -e "${GREEN}✓ Xray configuration created${NC}"
-
-# Update configuration
+# Update Xray configuration via API
 echo
-echo -e "${YELLOW}Updating Xray configuration...${NC}"
+echo "Updating Xray configuration..."
 new_config=$(cat "$config_file")
 update_response=$(curl -s -X PUT "http://$domain_url/api/xray" \
     -H "Authorization: Bearer $token" \
@@ -195,17 +157,9 @@ update_response=$(curl -s -X PUT "http://$domain_url/api/xray" \
     -H "X-Forwarded-Proto: https" \
     -d "$new_config")
 
-# Check if update was successful
-if echo "$update_response" | jq -e '.ok' > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ Xray configuration updated successfully${NC}"
-else
-    echo -e "${RED}Failed to update Xray configuration!${NC}"
-    echo -e "${YELLOW}Response: $update_response${NC}"
-fi
-
-# Clean up
+# Remove temporary config file
 rm -f "$config_file"
 
-# Display summary
 echo
-echo -e "${GREEN}=== Xray Setup Complete! ===${NC}"
+echo "✓ API configuration completed!"
+echo
