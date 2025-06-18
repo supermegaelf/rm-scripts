@@ -377,5 +377,5 @@ chmod +x install_template.sh
 ./install_template.sh
 
 echo
-echo -e "${GREEN}✓ Node successfully launched!${NC}"
+echo -e "${GREEN}✓ Node setup completed successfully!${NC}"
 echo
