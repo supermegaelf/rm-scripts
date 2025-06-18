@@ -123,7 +123,7 @@ echo "Username: $SUPERADMIN_USERNAME"
 echo "Password: $SUPERADMIN_PASSWORD"
 echo "========================================="
 
-# Install alias (moved here to execute before logs)
+# Install alias
 echo
 echo "Installing remnawave_reverse alias..."
 mkdir -p /usr/local/remnawave_reverse/
@@ -135,6 +135,8 @@ bashrc_file="/etc/bash.bashrc"
 alias_line="alias rr='remnawave_reverse'"
 echo "$alias_line" >> "$bashrc_file"
 
+echo
+echo "✓ Remnawave setup completed successfully!"
 echo
 echo "Containers restarted. Following logs (press Ctrl+C to exit)..."
 echo
