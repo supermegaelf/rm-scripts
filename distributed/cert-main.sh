@@ -10,15 +10,6 @@ echo "Remnawave Structure and Certificates Setup"
 echo "========================================="
 echo
 
-# Load environment variables
-if [ -f "remnawave-vars.sh" ]; then
-    source remnawave-vars.sh
-else
-    echo "Error: remnawave-vars.sh not found!"
-    echo "Please run var-main.sh first."
-    exit 1
-fi
-
 # Create directory structure
 echo "Creating directory structure..."
 mkdir -p /opt/remnawave && cd /opt/remnawave
