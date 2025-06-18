@@ -5,6 +5,9 @@
 
 set -e
 
+# Trap for Ctrl+C to show credentials
+trap 'echo; echo "========================================"; echo "Remnawave URL:"; echo "https://${PANEL_DOMAIN}/auth/login?${cookies_random1}=${cookies_random2}"; echo; echo "Credentials:"; echo "Username: $SUPERADMIN_USERNAME"; echo "Password: $SUPERADMIN_PASSWORD"; echo; exit 0' INT
+
 echo "========================================="
 echo "Remnawave Final Setup"
 echo "========================================="
@@ -107,7 +110,11 @@ echo "Restarting containers..."
 cd /opt/remnawave
 docker compose down
 sleep 1
-docker compose up -d && docker compose logs -f
+docker compose up -d
+echo
+echo "Containers restarted. Following logs (press Ctrl+C to see credentials)..."
+echo
+docker compose logs -f
 
 # Display results
 echo
