@@ -19,10 +19,9 @@ export SELFSTEAL_DOMAIN=""
 export CLOUDFLARE_API_KEY=""
 export CLOUDFLARE_EMAIL=""
 
-# Генерируемые переменные
+# Generated variables
 export SUPERADMIN_USERNAME=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
 
-# Правильная генерация пароля
 password=""
 password+=$(head /dev/urandom | tr -dc 'A-Z' | head -c 1)
 password+=$(head /dev/urandom | tr -dc 'a-z' | head -c 1)
@@ -42,6 +41,7 @@ EOF
 echo "File remnawave-vars.sh created."
 echo
 echo "Opening nano editor..."
+echo
 sleep 2
 
 nano remnawave-vars.sh
