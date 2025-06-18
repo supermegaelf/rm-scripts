@@ -1,76 +1,31 @@
 #!/bin/bash
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Remnawave configuration files creation script
+# Section 4: Creating configuration files
 
-echo -e "${BLUE}=== Remnawave Config Generator ===${NC}"
-echo -e "${YELLOW}Generating configuration files...${NC}"
+set -e
+
+echo "========================================="
+echo "Remnawave Configuration Files Setup"
+echo "========================================="
 echo
 
-# Function to load variables from remnawave-vars.sh
-load_variables() {
-    echo -e "${YELLOW}Loading environment variables...${NC}"
-    
-    if [ -f "remnawave-vars.sh" ]; then
-        source remnawave-vars.sh
-        echo -e "${GREEN}✓ Variables loaded from remnawave-vars.sh${NC}"
-    else
-        echo -e "${RED}remnawave-vars.sh not found!${NC}"
-        echo -e "${YELLOW}Please run the setup script first to generate variables${NC}"
-        exit 1
-    fi
-}
+# Load environment variables
+if [ -f "remnawave-vars.sh" ]; then
+    source remnawave-vars.sh
+else
+    echo "Error: remnawave-vars.sh not found!"
+    echo "Please run var-main.sh first."
+    exit 1
+fi
 
-# Function to check if variables are set
-check_variables() {
-    echo -e "${YELLOW}Checking required variables...${NC}"
-    
-    local missing_vars=()
-    
-    # Check main variables
-    [[ -z "$PANEL_DOMAIN" ]] && missing_vars+=("PANEL_DOMAIN")
-    [[ -z "$SUB_DOMAIN" ]] && missing_vars+=("SUB_DOMAIN")
-    [[ -z "$JWT_AUTH_SECRET" ]] && missing_vars+=("JWT_AUTH_SECRET")
-    [[ -z "$JWT_API_TOKENS_SECRET" ]] && missing_vars+=("JWT_API_TOKENS_SECRET")
-    [[ -z "$SUPERADMIN_USERNAME" ]] && missing_vars+=("SUPERADMIN_USERNAME")
-    [[ -z "$SUPERADMIN_PASSWORD" ]] && missing_vars+=("SUPERADMIN_PASSWORD")
-    [[ -z "$METRICS_USER" ]] && missing_vars+=("METRICS_USER")
-    [[ -z "$METRICS_PASS" ]] && missing_vars+=("METRICS_PASS")
-    
-    if [[ ${#missing_vars[@]} -gt 0 ]]; then
-        echo -e "${RED}Missing variables: ${missing_vars[*]}${NC}"
-        echo -e "${RED}Please run remnawave-vars.sh first to generate variables!${NC}"
-        exit 1
-    fi
-    
-    echo -e "${GREEN}✓ All required variables found${NC}"
-}
+# Extract base domains
+PANEL_BASE_DOMAIN=$(echo "$PANEL_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
+SUB_BASE_DOMAIN=$(echo "$SUB_DOMAIN" | awk -F'.' '{if (NF > 2) {print $(NF-1)"."$NF} else {print $0}}')
 
-# Function to get base domain
-get_base_domain() {
-    local domain="$1"
-    echo "$domain" | sed 's/^[^.]*\.//'
-}
-
-# Function to create directory
-create_directory() {
-    echo -e "${YELLOW}Creating /opt/remnawave directory...${NC}"
-    mkdir -p /opt/remnawave
-    echo -e "${GREEN}✓ Directory created${NC}"
-}
-
-# Function to create .env file
-create_env_file() {
-    echo -e "${YELLOW}Creating .env file...${NC}"
-    
-    local panel_base_domain=$(get_base_domain "$PANEL_DOMAIN")
-    local sub_base_domain=$(get_base_domain "$SUB_DOMAIN")
-    
-    cat > /opt/remnawave/.env <<EOL
+# Create .env file
+echo "Creating .env file..."
+cat > /opt/remnawave/.env <<EOL
 ### APP ###
 APP_PORT=3000
 METRICS_PORT=3001
@@ -171,17 +126,10 @@ POSTGRES_PASSWORD=postgres
 POSTGRES_DB=postgres
 EOL
 
-    echo -e "${GREEN}✓ .env file created in /opt/remnawave/${NC}"
-}
-
-# Function to create docker-compose.yml file
-create_docker_compose() {
-    echo -e "${YELLOW}Creating docker-compose.yml file...${NC}"
-    
-    local panel_base_domain=$(get_base_domain "$PANEL_DOMAIN")
-    local sub_base_domain=$(get_base_domain "$SUB_DOMAIN")
-    
-    cat > /opt/remnawave/docker-compose.yml <<EOL
+# Create docker-compose.yml file
+echo
+echo "Creating docker-compose.yml file..."
+cat > /opt/remnawave/docker-compose.yml <<EOL
 services:
   remnawave-db:
     image: postgres:17
@@ -261,10 +209,10 @@ services:
     restart: always
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - /etc/letsencrypt/live/$panel_base_domain/fullchain.pem:/etc/nginx/ssl/$PANEL_DOMAIN/fullchain.pem:ro
-      - /etc/letsencrypt/live/$panel_base_domain/privkey.pem:/etc/nginx/ssl/$PANEL_DOMAIN/privkey.pem:ro
-      - /etc/letsencrypt/live/$sub_base_domain/fullchain.pem:/etc/nginx/ssl/$SUB_DOMAIN/fullchain.pem:ro
-      - /etc/letsencrypt/live/$sub_base_domain/privkey.pem:/etc/nginx/ssl/$SUB_DOMAIN/privkey.pem:ro
+      - /etc/letsencrypt/live/$PANEL_BASE_DOMAIN/fullchain.pem:/etc/nginx/ssl/$PANEL_DOMAIN/fullchain.pem:ro
+      - /etc/letsencrypt/live/$PANEL_BASE_DOMAIN/privkey.pem:/etc/nginx/ssl/$PANEL_DOMAIN/privkey.pem:ro
+      - /etc/letsencrypt/live/$SUB_BASE_DOMAIN/fullchain.pem:/etc/nginx/ssl/$SUB_DOMAIN/fullchain.pem:ro
+      - /etc/letsencrypt/live/$SUB_BASE_DOMAIN/privkey.pem:/etc/nginx/ssl/$SUB_DOMAIN/privkey.pem:ro
     network_mode: host
     depends_on:
       - remnawave
@@ -315,34 +263,11 @@ volumes:
     name: remnawave-redis-data
 EOL
 
-    echo -e "${GREEN}✓ docker-compose.yml file created in /opt/remnawave/${NC}"
-}
+# Download index.html
+echo
+echo "Downloading index.html..."
+wget -P /opt/remnawave/ https://raw.githubusercontent.com/supermegaelf/rm-pages/main/index.html
 
-# Function to download index.html
-download_index_html() {
-    echo -e "${YELLOW}Downloading index.html...${NC}"
-    
-    # Download index.html
-    if wget -P /opt/remnawave/ https://raw.githubusercontent.com/supermegaelf/rm-pages/main/index.html >/dev/null 2>&1; then
-        echo -e "${GREEN}✓ index.html downloaded to /opt/remnawave/${NC}"
-    else
-        echo -e "${RED}Failed to download index.html${NC}"
-        echo -e "${YELLOW}You may need to download it manually from:${NC}"
-        echo -e "${BLUE}https://raw.githubusercontent.com/supermegaelf/rm-pages/main/index.html${NC}"
-    fi
-}
-
-# Main execution
-load_variables
 echo
-check_variables
+echo "✓ Configuration files created successfully!"
 echo
-create_directory
-echo
-create_env_file
-echo
-create_docker_compose
-echo
-download_index_html
-echo
-echo -e "${GREEN}=== All configuration files created successfully! ===${NC}"
