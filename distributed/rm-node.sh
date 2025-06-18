@@ -12,9 +12,9 @@ NC='\033[0m'
 
 # Remnawave Node setup script
 echo
-echo -e "${NC}=======================${NC}"
-echo -e "${CYAN}REMNAWAVE PANNEL SETUP${NC}"
-echo -e "${NC}=======================${NC}"
+echo -e "${YELLOW}=======================${NC}"
+echo -e "${NC}REMNAWAVE PANNEL SETUP${NC}"
+echo -e "${YELLOW}=======================${NC}"
 echo
 
 set -e
