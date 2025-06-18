@@ -10,15 +10,6 @@ echo "Remnawave API Configuration"
 echo "========================================="
 echo
 
-# Load environment variables
-if [ -f "remnawave-vars.sh" ]; then
-    source remnawave-vars.sh
-else
-    echo "Error: remnawave-vars.sh not found!"
-    echo "Please run var-main.sh first."
-    exit 1
-fi
-
 # Set API URL
 domain_url="127.0.0.1:3000"
 
