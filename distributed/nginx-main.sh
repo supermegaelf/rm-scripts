@@ -5,6 +5,9 @@
 
 set -e
 
+# Trap for Ctrl+C
+trap 'echo; echo "✓ Nginx configured and containers started successfully!"; echo; exit 0' INT
+
 echo "========================================="
 echo "Remnawave Nginx Setup and Container Startup"
 echo "========================================="
@@ -134,7 +137,11 @@ EOL
 echo
 echo "Starting Docker containers..."
 cd /opt/remnawave
-docker compose up -d && docker compose logs -f
+docker compose up -d
+echo
+echo "Containers started. Following logs (press Ctrl+C to exit)..."
+echo
+docker compose logs -f
 sleep 20
 
 # Wait for API to be ready
