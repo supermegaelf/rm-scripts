@@ -47,6 +47,7 @@ echo
 echo "Loading environment variables..."
 source node-vars.sh
 
+echo
 echo -e "${GREEN}------------------------------------${NC}"
 echo -e "${NC}✓ Environment variables configured!${NC}"
 echo -e "${GREEN}------------------------------------${NC}"
@@ -118,6 +119,7 @@ echo unattended-upgrades unattended-upgrades/enable_auto_updates boolean true | 
 dpkg-reconfigure -f noninteractive unattended-upgrades
 systemctl restart unattended-upgrades
 
+echo
 echo -e "${GREEN}----------------------------------${NC}"
 echo -e "${NC}✓ Package installation completed!${NC}"
 echo -e "${GREEN}----------------------------------${NC}"
@@ -198,6 +200,7 @@ echo "Configuring certificate renewal..."
 echo "renew_hook = sh -c 'cd /opt/remnawave && docker compose down remnawave-nginx && docker compose up -d remnawave-nginx'" >> /etc/letsencrypt/renewal/$SELFSTEAL_BASE_DOMAIN.conf
 (crontab -u root -l 2>/dev/null; echo "0 5 1 */2 * /usr/bin/certbot renew --quiet >> /usr/local/remnawave_reverse/cron_jobs.log 2>&1") | crontab -u root -
 
+echo
 echo -e "${GREEN}----------------------------------------------${NC}"
 echo -e "${NC}✓ Structure and certificates setup completed!${NC}"
 echo -e "${GREEN}----------------------------------------------${NC}"
@@ -206,7 +209,6 @@ echo
 echo -e "${GREEN}================================${NC}"
 echo -e "${NC}4. Creating configuration files${NC}"
 echo -e "${GREEN}================================${NC}"
-echo
 
 # Create docker-compose.yml file
 echo
@@ -289,6 +291,7 @@ server {
 }
 EOL
 
+echo
 echo -e "${GREEN}--------------------------------------------${NC}"
 echo -e "${NC}✓ Configuration files created successfully!${NC}"
 echo -e "${GREEN}--------------------------------------------${NC}"
@@ -297,7 +300,6 @@ echo
 echo -e "${GREEN}===========================================${NC}"
 echo -e "${NC}6. Configuring UFW and starting containers${NC}"
 echo -e "${GREEN}===========================================${NC}"
-echo
 
 # Configure UFW and start containers
 echo
@@ -308,6 +310,7 @@ cd /opt/remnawave
 docker compose up -d
 sleep 3
 
+echo
 echo -e "${GREEN}----------------------------------------${NC}"
 echo -e "${NC}✓ UFW installed and containers started!${NC}"
 echo -e "${GREEN}----------------------------------------${NC}"
@@ -316,7 +319,6 @@ echo
 echo -e "${GREEN}====================================${NC}"
 echo -e "${NC}7. Setting a random masking pattern${NC}"
 echo -e "${GREEN}====================================${NC}"
-echo
 
 # Set a random masking pattern
 echo
@@ -381,6 +383,7 @@ EOF
 chmod +x install_template.sh
 ./install_template.sh
 
+echo
 echo -e "${GREEN}-------------------------------------${NC}"
 echo -e "${NC}✓ Node setup completed successfully!${NC}"
 echo -e "${GREEN}-------------------------------------${NC}"
