@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Remnawave setup script
+# Remnawave Node setup script
 
 echo -e "${GREEN}=========================${NC}"
-echo -e "${NC}Remnawave Pannel Setup${NC}"
+echo -e "${NC}Remnawave Node Setup${NC}"
 echo -e "${GREEN}=========================${NC}"
 echo
 
