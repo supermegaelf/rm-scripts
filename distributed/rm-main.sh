@@ -63,6 +63,7 @@ echo
 echo "Loading environment variables..."
 source remnawave-vars.sh
 
+echo
 echo -e "${GREEN}------------------------------------${NC}"
 echo -e "${NC}✓ Environment variables configured!${NC}"
 echo -e "${GREEN}------------------------------------${NC}"
@@ -134,6 +135,7 @@ echo unattended-upgrades unattended-upgrades/enable_auto_updates boolean true | 
 dpkg-reconfigure -f noninteractive unattended-upgrades
 systemctl restart unattended-upgrades
 
+echo
 echo -e "${GREEN}----------------------------------${NC}"
 echo -e "${NC}✓ Package installation completed!${NC}"
 echo -e "${GREEN}----------------------------------${NC}"
@@ -226,6 +228,7 @@ echo "renew_hook = sh -c 'cd /opt/remnawave && docker compose down remnawave-ngi
 echo "renew_hook = sh -c 'cd /opt/remnawave && docker compose down remnawave-nginx && docker compose up -d remnawave-nginx'" >> /etc/letsencrypt/renewal/$SUB_BASE_DOMAIN.conf
 (crontab -u root -l 2>/dev/null; echo "0 5 1 */2 * /usr/bin/certbot renew --quiet >> /usr/local/remnawave_reverse/cron_jobs.log 2>&1") | crontab -u root -
 
+echo
 echo -e "${GREEN}----------------------------------------------${NC}"
 echo -e "${NC}✓ Structure and certificates setup completed!${NC}"
 echo -e "${GREEN}----------------------------------------------${NC}"
@@ -619,6 +622,7 @@ until curl -s "http://127.0.0.1:3000/api/auth/register" \
     sleep 10
 done
 
+echo
 echo -e "${GREEN}--------------------------------------------------------${NC}"
 echo -e "${NC}✓ Nginx configured and containers started successfully!${NC}"
 echo -e "${GREEN}--------------------------------------------------------${NC}"
@@ -770,6 +774,7 @@ update_response=$(curl -s -X PUT "http://$domain_url/api/xray" \
 # Remove temporary config file
 rm -f "$config_file"
 
+echo
 echo -e "${GREEN}-------------------------------${NC}"
 echo -e "${NC}✓ API configuration completed!${NC}"
 echo -e "${GREEN}-------------------------------${NC}"
@@ -778,7 +783,6 @@ echo
 echo -e "${GREEN}===============================================${NC}"
 echo -e "${NC}7. Creating node, host and final configuration${NC}"
 echo -e "${GREEN}===============================================${NC}"
-echo
 
 # Create node
 echo
@@ -867,7 +871,7 @@ bashrc_file="/etc/bash.bashrc"
 alias_line="alias rr='remnawave_reverse'"
 echo "$alias_line" >> "$bashrc_file"
 
-# Display results BEFORE logs
+echo
 echo -e "${GREEN}-----------------------------------------${NC}"
 echo -e "${NC}✓ Remnawave setup completed successfully!${NC}"
 echo -e "${GREEN}-----------------------------------------${NC}"
