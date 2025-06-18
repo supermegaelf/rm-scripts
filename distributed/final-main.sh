@@ -111,33 +111,31 @@ cd /opt/remnawave
 docker compose down
 sleep 1
 docker compose up -d
-echo
-echo "Containers restarted. Following logs (press Ctrl+C to see credentials)..."
-echo
-docker compose logs -f
 
-# Display results
+# Display results BEFORE logs
 echo
+echo "========================================="
 echo "Remnawave URL:"
 echo "https://${PANEL_DOMAIN}/auth/login?${cookies_random1}=${cookies_random2}"
 echo
 echo "Credentials:"
 echo "Username: $SUPERADMIN_USERNAME"
 echo "Password: $SUPERADMIN_PASSWORD"
-echo
+echo "========================================="
 
-# Install alias
+# Install alias (moved here to execute before logs)
+echo
 echo "Installing remnawave_reverse alias..."
 mkdir -p /usr/local/remnawave_reverse/
 wget -q -O /usr/local/remnawave_reverse/remnawave_reverse "https://raw.githubusercontent.com/eGamesAPI/remnawave-reverse-proxy/refs/heads/main/install_remnawave.sh"
 chmod +x /usr/local/remnawave_reverse/remnawave_reverse
 ln -sf /usr/local/remnawave_reverse/remnawave_reverse /usr/local/bin/remnawave_reverse
 
-# Add alias to bashrc
 bashrc_file="/etc/bash.bashrc"
 alias_line="alias rr='remnawave_reverse'"
 echo "$alias_line" >> "$bashrc_file"
 
 echo
-echo "✓ Remnawave setup completed successfully!"
+echo "Containers restarted. Following logs (press Ctrl+C to exit)..."
 echo
+docker compose logs -f
