@@ -41,13 +41,6 @@ EOF
 
 echo "File remnawave-vars.sh created."
 echo
-echo "Please edit the following variables:"
-echo "  - PANEL_DOMAIN"
-echo "  - SUB_DOMAIN"
-echo "  - SELFSTEAL_DOMAIN"
-echo "  - CLOUDFLARE_API_KEY"
-echo "  - CLOUDFLARE_EMAIL"
-echo
 echo "Opening nano editor..."
 sleep 2
 
@@ -59,7 +52,4 @@ source remnawave-vars.sh
 
 echo
 echo "✓ Environment variables configured!"
-echo
-echo "To verify, use command:"
-echo "cat remnawave-vars.sh"
 echo
