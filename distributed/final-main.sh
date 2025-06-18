@@ -13,21 +13,6 @@ echo "Remnawave Final Setup"
 echo "========================================="
 echo
 
-# Set API URL
-domain_url="127.0.0.1:3000"
-
-# Need to get token again (since this is a separate script)
-echo "Authenticating..."
-register_response=$(curl -s -X POST "http://$domain_url/api/auth/register" \
-    -H "Authorization: Bearer " \
-    -H "Content-Type: application/json" \
-    -H "Host: $PANEL_DOMAIN" \
-    -H "X-Forwarded-For: 127.0.0.1" \
-    -H "X-Forwarded-Proto: https" \
-    -d "{\"username\":\"$SUPERADMIN_USERNAME\",\"password\":\"$SUPERADMIN_PASSWORD\"}")
-
-token=$(echo "$register_response" | jq -r '.response.accessToken')
-
 # Create node
 echo
 echo "Creating node..."
