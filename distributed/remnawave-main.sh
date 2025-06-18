@@ -2,9 +2,9 @@
 
 # Remnawave setup script
 
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}=======================${NC}"
 echo -e "${NC}Remnawave Pannel Setup${NC}"
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}=======================${NC}"
 echo
 
 # Colors
@@ -63,13 +63,14 @@ echo
 echo "Loading environment variables..."
 source remnawave-vars.sh
 
-echo
-echo -e "${GREEN}✓ Environment variables configured!${NC}"
+echo -e "${GREEN}------------------------------------${NC}"
+echo -e "${NC}✓ Environment variables configured!${NC}"
+echo -e "${GREEN}------------------------------------${NC}"
 echo
 
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}=======================${NC}"
 echo -e "${NC}2. Installing packages${NC}"
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}=======================${NC}"
 echo
 
 # Update package list and install basic packages
@@ -133,13 +134,14 @@ echo unattended-upgrades unattended-upgrades/enable_auto_updates boolean true | 
 dpkg-reconfigure -f noninteractive unattended-upgrades
 systemctl restart unattended-upgrades
 
-echo
-echo -e "${GREEN}✓ Package installation completed!${NC}"
+echo -e "${GREEN}----------------------------------${NC}"
+echo -e "${NC}✓ Package installation completed!${NC}"
+echo -e "${GREEN}----------------------------------${NC}"
 echo
 
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}=======================================${NC}"
 echo -e "${NC}3. Creating structure and certificates${NC}"
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}=======================================${NC}"
 echo
 
 # Create directory structure
@@ -224,13 +226,14 @@ echo "renew_hook = sh -c 'cd /opt/remnawave && docker compose down remnawave-ngi
 echo "renew_hook = sh -c 'cd /opt/remnawave && docker compose down remnawave-nginx && docker compose up -d remnawave-nginx'" >> /etc/letsencrypt/renewal/$SUB_BASE_DOMAIN.conf
 (crontab -u root -l 2>/dev/null; echo "0 5 1 */2 * /usr/bin/certbot renew --quiet >> /usr/local/remnawave_reverse/cron_jobs.log 2>&1") | crontab -u root -
 
-echo
-echo -e "${GREEN}✓ Structure and certificates setup completed!${NC}"
+echo -e "${GREEN}----------------------------------------------${NC}"
+echo -e "${NC}✓ Structure and certificates setup completed!${NC}"
+echo -e "${GREEN}----------------------------------------------${NC}"
 echo
 
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}================================${NC}"
 echo -e "${NC}4. Creating configuration files${NC}"
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}================================${NC}"
 echo
 
 # Create .env file
@@ -478,13 +481,14 @@ echo
 echo "Downloading index.html..."
 wget -P /opt/remnawave/ https://raw.githubusercontent.com/supermegaelf/rm-pages/main/index.html
 
-echo
-echo -e "${GREEN}✓ Configuration files created successfully!${NC}"
+echo -e "${GREEN}--------------------------------------------${NC}"
+echo -e "${NC}✓ Configuration files created successfully!${NC}"
+echo -e "${GREEN}--------------------------------------------${NC}"
 echo
 
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}===============================================${NC}"
 echo -e "${NC}5. Creating nginx.conf and starting containers${NC}"
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}===============================================${NC}"
 echo
 
 # Create nginx.conf file
@@ -615,13 +619,14 @@ until curl -s "http://127.0.0.1:3000/api/auth/register" \
     sleep 10
 done
 
-echo
-echo -e "${GREEN}✓ Nginx configured and containers started successfully!${NC}"
+echo -e "${GREEN}--------------------------------------------------------${NC}"
+echo -e "${NC}✓ Nginx configured and containers started successfully!${NC}"
+echo -e "${GREEN}--------------------------------------------------------${NC}"
 echo
 
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}==========================================${NC}"
 echo -e "${NC}6. Registration and customization via API${NC}"
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}==========================================${NC}"
 echo
 
 # Set API URL
@@ -765,13 +770,14 @@ update_response=$(curl -s -X PUT "http://$domain_url/api/xray" \
 # Remove temporary config file
 rm -f "$config_file"
 
-echo
-echo -e "${GREEN}✓ API configuration completed!${NC}"
+echo -e "${GREEN}-------------------------------${NC}"
+echo -e "${NC}✓ API configuration completed!${NC}"
+echo -e "${GREEN}-------------------------------${NC}"
 echo
 
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}===============================================${NC}"
 echo -e "${NC}7. Creating node, host and final configuration${NC}"
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}===============================================${NC}"
 echo
 
 # Create node
@@ -862,8 +868,9 @@ alias_line="alias rr='remnawave_reverse'"
 echo "$alias_line" >> "$bashrc_file"
 
 # Display results BEFORE logs
-echo
-echo -e "${GREEN}✓ Remnawave setup completed successfully!${NC}"
+echo -e "${GREEN}-----------------------------------------${NC}"
+echo -e "${NC}✓ Remnawave setup completed successfully!${NC}"
+echo -e "${GREEN}-----------------------------------------${NC}"
 echo
 echo "Remnawave URL:"
 echo "https://${PANEL_DOMAIN}/auth/login?${cookies_random1}=${cookies_random2}"
