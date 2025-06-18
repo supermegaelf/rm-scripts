@@ -44,7 +44,7 @@ ask_certificate() {
 }
 
 # Request parameters
-ask_input "SELFSTEAL_DOMAIN (e.g: selfsteal.example.com)" SELFSTEAL_DOMAIN
+ask_input "SELFSTEAL_DOMAIN (e.g: example.com)" SELFSTEAL_DOMAIN
 ask_input "PANEL_IP (e.g: 192.168.1.100)" PANEL_IP
 ask_input "CLOUDFLARE_API_KEY" CLOUDFLARE_API_KEY
 ask_input "CLOUDFLARE_EMAIL" CLOUDFLARE_EMAIL
