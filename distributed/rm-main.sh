@@ -286,6 +286,10 @@ echo -e "${NC}4. Creating configuration files${NC}"
 echo -e "${GREEN}================================${NC}"
 echo
 
+# Copy variables file to configuration directory
+echo "Copying variables file..."
+cp remnawave-vars.sh /opt/remnawave/
+
 # Create .env file
 echo "Creating .env file..."
 cat > /opt/remnawave/.env <<EOL
