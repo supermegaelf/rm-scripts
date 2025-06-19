@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -24,34 +23,89 @@ echo -e "${NC}1. Environment variables${NC}"
 echo -e "${GREEN}=========================${NC}"
 echo
 
-# Create variables file
+# Interactive input for variables
+echo -e "${CYAN}Please enter the required information:${NC}"
+echo
+
+# Self-steal domain
+read -p "Self-steal domain (e.g., example.com): " SELFSTEAL_DOMAIN
+while [[ -z "$SELFSTEAL_DOMAIN" ]]; do
+    echo -e "${RED}Self-steal domain cannot be empty!${NC}"
+    read -p "Self-steal domain (e.g., example.com): " SELFSTEAL_DOMAIN
+done
+
+# Panel IP
+read -p "Panel IP address: " PANEL_IP
+while [[ -z "$PANEL_IP" ]]; do
+    echo -e "${RED}Panel IP cannot be empty!${NC}"
+    read -p "Panel IP address: " PANEL_IP
+done
+
+# Cloudflare API Key
+read -p "Cloudflare API Key: " CLOUDFLARE_API_KEY
+while [[ -z "$CLOUDFLARE_API_KEY" ]]; do
+    echo -e "${RED}Cloudflare API Key cannot be empty!${NC}"
+    read -p "Cloudflare API Key: " CLOUDFLARE_API_KEY
+done
+
+# Cloudflare Email
+read -p "Cloudflare Email: " CLOUDFLARE_EMAIL
+while [[ -z "$CLOUDFLARE_EMAIL" ]]; do
+    echo -e "${RED}Cloudflare Email cannot be empty!${NC}"
+    read -p "Cloudflare Email: " CLOUDFLARE_EMAIL
+done
+
+# Certificate from panel
+echo
+echo -e "${YELLOW}Please paste the certificate from the panel:${NC}"
+echo -e "${CYAN}(Include the entire SSL_CERT=\"...\" line)${NC}"
+echo -e "${CYAN}Press Enter when done:${NC}"
+read -r CERTIFICATE
+while [[ -z "$CERTIFICATE" ]]; do
+    echo -e "${RED}Certificate cannot be empty!${NC}"
+    echo -e "${CYAN}Please paste the entire SSL_CERT=\"...\" line:${NC}"
+    read -r CERTIFICATE
+done
+
+# Create variables file for persistence
 cat > node-vars.sh << 'EOF'
 # node-vars.sh
-export SELFSTEAL_DOMAIN=""
-export PANEL_IP=""
-export CLOUDFLARE_API_KEY=""
-export CLOUDFLARE_EMAIL=""
-
-# Сертификат от панели (вставьте полностью, включая SSL_CERT=)
-export CERTIFICATE='SSL_CERT="сюда_вставить_публичный_ключ_от_панели"'
+export SELFSTEAL_DOMAIN="${SELFSTEAL_DOMAIN}"
+export PANEL_IP="${PANEL_IP}"
+export CLOUDFLARE_API_KEY="${CLOUDFLARE_API_KEY}"
+export CLOUDFLARE_EMAIL="${CLOUDFLARE_EMAIL}"
+# Certificate from the panel
+export CERTIFICATE='${CERTIFICATE}'
 EOF
 
-echo "File node-vars.sh created."
-echo
-echo "Opening nano editor..."
-sleep 2
+# Replace placeholders with actual values
+sed -i "s|\${SELFSTEAL_DOMAIN}|$SELFSTEAL_DOMAIN|g" node-vars.sh
+sed -i "s|\${PANEL_IP}|$PANEL_IP|g" node-vars.sh
+sed -i "s|\${CLOUDFLARE_API_KEY}|$CLOUDFLARE_API_KEY|g" node-vars.sh
+sed -i "s|\${CLOUDFLARE_EMAIL}|$CLOUDFLARE_EMAIL|g" node-vars.sh
+# For certificate, we need to escape it properly
+escaped_cert=$(printf '%s\n' "$CERTIFICATE" | sed 's/[[\.*^$()+?{|]/\\&/g')
+sed -i "s|\${CERTIFICATE}|$escaped_cert|g" node-vars.sh
 
-nano node-vars.sh
-
 echo
-echo "Loading environment variables..."
+echo -e "${GREEN}Variables saved to node-vars.sh${NC}"
+echo
+echo -e "${GREEN}Summary of configuration:${NC}"
+echo -e "Self-steal domain: ${CYAN}$SELFSTEAL_DOMAIN${NC}"
+echo -e "Panel IP: ${CYAN}$PANEL_IP${NC}"
+echo -e "Cloudflare email: ${CYAN}$CLOUDFLARE_EMAIL${NC}"
+echo -e "Certificate: ${CYAN}[Loaded successfully]${NC}"
+echo
+
+# Load environment variables
 source node-vars.sh
 
-echo
 echo -e "${GREEN}------------------------------------${NC}"
 echo -e "${NC}✓ Environment variables configured!${NC}"
 echo -e "${GREEN}------------------------------------${NC}"
 echo
+
+# Rest of the script continues...
 
 echo -e "${GREEN}=======================${NC}"
 echo -e "${NC}2. Installing packages${NC}"
