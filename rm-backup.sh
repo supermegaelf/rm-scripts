@@ -80,6 +80,7 @@ tar --exclude='/opt/remnawave/db-backup' \
     /opt/remnawave/.env \
     /opt/remnawave/docker-compose.yml \
     /opt/remnawave/nginx.conf \
+    /opt/remnawave/remnawave-vars.sh \
     /etc/letsencrypt/live/ \
     /etc/letsencrypt/renewal/
 
