@@ -24,17 +24,44 @@ echo -e "${NC}1. Environment variables${NC}"
 echo -e "${GREEN}=========================${NC}"
 echo
 
-# Create variables file
-cat > remnawave-vars.sh << 'EOF'
-# remnawave-vars.sh
-export PANEL_DOMAIN=""
-export SUB_DOMAIN=""
-export SELFSTEAL_DOMAIN=""
-export CLOUDFLARE_API_KEY=""
-export CLOUDFLARE_EMAIL=""
+# Interactive input for variables
+echo -e "${CYAN}Please enter the required information:${NC}"
+echo
 
-# Generated variables
-export SUPERADMIN_USERNAME=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
+read -p "Panel domain (e.g., example.com): " PANEL_DOMAIN
+while [[ -z "$PANEL_DOMAIN" ]]; do
+    echo -e "${RED}Panel domain cannot be empty!${NC}"
+    read -p "Panel domain (e.g., example.com): " PANEL_DOMAIN
+done
+
+read -p "Subscription domain (e.g., example.com): " SUB_DOMAIN
+while [[ -z "$SUB_DOMAIN" ]]; do
+    echo -e "${RED}Subscription domain cannot be empty!${NC}"
+    read -p "Subscription domain (e.g., example.com): " SUB_DOMAIN
+done
+
+read -p "Self-steal domain (e.g., example.com): " SELFSTEAL_DOMAIN
+while [[ -z "$SELFSTEAL_DOMAIN" ]]; do
+    echo -e "${RED}Self-steal domain cannot be empty!${NC}"
+    read -p "Self-steal domain (e.g., example.com): " SELFSTEAL_DOMAIN
+done
+
+read -p "Cloudflare API Key: " CLOUDFLARE_API_KEY
+while [[ -z "$CLOUDFLARE_API_KEY" ]]; do
+    echo -e "${RED}Cloudflare API Key cannot be empty!${NC}"
+    read -p "Cloudflare API Key: " CLOUDFLARE_API_KEY
+done
+
+read -p "Cloudflare Email: " CLOUDFLARE_EMAIL
+while [[ -z "$CLOUDFLARE_EMAIL" ]]; do
+    echo -e "${RED}Cloudflare Email cannot be empty!${NC}"
+    read -p "Cloudflare Email: " CLOUDFLARE_EMAIL
+done
+
+# Generate random values
+echo
+echo -e "${YELLOW}Generating secure random values...${NC}"
+SUPERADMIN_USERNAME=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
 
 password=""
 password+=$(head /dev/urandom | tr -dc 'A-Z' | head -c 1)
@@ -42,28 +69,48 @@ password+=$(head /dev/urandom | tr -dc 'a-z' | head -c 1)
 password+=$(head /dev/urandom | tr -dc '0-9' | head -c 1)
 password+=$(head /dev/urandom | tr -dc '!@#%^&*()_+' | head -c 3)
 password+=$(head /dev/urandom | tr -dc 'A-Za-z0-9!@#%^&*()_+' | head -c $((24 - 6)))
-export SUPERADMIN_PASSWORD=$(echo "$password" | fold -w1 | shuf | tr -d '\n')
+SUPERADMIN_PASSWORD=$(echo "$password" | fold -w1 | shuf | tr -d '\n')
 
-export cookies_random1=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
-export cookies_random2=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
-export METRICS_USER=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
-export METRICS_PASS=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
-export JWT_AUTH_SECRET=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 64)
-export JWT_API_TOKENS_SECRET=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 64)
+cookies_random1=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
+cookies_random2=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
+METRICS_USER=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
+METRICS_PASS=$(tr -dc 'a-zA-Z' < /dev/urandom | fold -w 8 | head -n 1)
+JWT_AUTH_SECRET=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 64)
+JWT_API_TOKENS_SECRET=$(openssl rand -base64 48 | tr -dc 'a-zA-Z0-9' | head -c 64)
+
+# Create variables file for persistence
+cat > remnawave-vars.sh << EOF
+# remnawave-vars.sh
+export PANEL_DOMAIN="$PANEL_DOMAIN"
+export SUB_DOMAIN="$SUB_DOMAIN"
+export SELFSTEAL_DOMAIN="$SELFSTEAL_DOMAIN"
+export CLOUDFLARE_API_KEY="$CLOUDFLARE_API_KEY"
+export CLOUDFLARE_EMAIL="$CLOUDFLARE_EMAIL"
+
+# Generated variables
+export SUPERADMIN_USERNAME="$SUPERADMIN_USERNAME"
+export SUPERADMIN_PASSWORD="$SUPERADMIN_PASSWORD"
+export cookies_random1="$cookies_random1"
+export cookies_random2="$cookies_random2"
+export METRICS_USER="$METRICS_USER"
+export METRICS_PASS="$METRICS_PASS"
+export JWT_AUTH_SECRET="$JWT_AUTH_SECRET"
+export JWT_API_TOKENS_SECRET="$JWT_API_TOKENS_SECRET"
 EOF
 
-echo "File remnawave-vars.sh created."
 echo
-echo "Opening nano editor..."
-sleep 2
-
-nano remnawave-vars.sh
-
+echo -e "${GREEN}Variables saved to remnawave-vars.sh${NC}"
 echo
-echo "Loading environment variables..."
+echo -e "${GREEN}Summary of configuration:${NC}"
+echo -e "Panel domain: ${CYAN}$PANEL_DOMAIN${NC}"
+echo -e "Subscription domain: ${CYAN}$SUB_DOMAIN${NC}"
+echo -e "Self-steal domain: ${CYAN}$SELFSTEAL_DOMAIN${NC}"
+echo -e "Cloudflare email: ${CYAN}$CLOUDFLARE_EMAIL${NC}"
+echo
+
+# Load environment variables
 source remnawave-vars.sh
 
-echo
 echo -e "${GREEN}------------------------------------${NC}"
 echo -e "${NC}✓ Environment variables configured!${NC}"
 echo -e "${GREEN}------------------------------------${NC}"
