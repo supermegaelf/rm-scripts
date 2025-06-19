@@ -49,7 +49,7 @@ if [ ! -d "$TEMP_DIR" ]; then
     echo "Error: Failed to create temporary directory"
     exit 1
 fi
-BACKUP_FILE="$TEMP_DIR/rm-backup-$(date +%d.%m.%Y_%H:%M).tar.gz"
+BACKUP_FILE="$TEMP_DIR/rm-backup-$(date +%d.%m.%Y_%H.%M).tar.gz"
 
 POSTGRES_CONTAINER_NAME="remnawave-db"
 if ! docker ps -q -f name="$POSTGRES_CONTAINER_NAME" | grep -q .; then
