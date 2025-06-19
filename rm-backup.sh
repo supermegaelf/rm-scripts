@@ -7,12 +7,12 @@ TG_BOT_TOKEN=""
 TG_CHAT_ID=""
 
 if [ -z "$TG_BOT_TOKEN" ] || [ -z "$TG_CHAT_ID" ]; then
-    read -p $'\033[32mPostgreSQL username (default is postgres, press Enter to use default): \033[0m' POSTGRES_USER_INPUT
+    read -p $'\033[32mPostgreSQL username (default is postgres, press Enter to use it): \033[0m' POSTGRES_USER_INPUT
     POSTGRES_USER=${POSTGRES_USER_INPUT:-postgres}
-    read -sp $'\033[32mPostgreSQL password (default is postgres, press Enter to use default): \033[0m' POSTGRES_PASSWORD_INPUT
+    read -sp $'\033[32mPostgreSQL password (default is postgres, press Enter to use it): \033[0m' POSTGRES_PASSWORD_INPUT
     echo
     POSTGRES_PASSWORD=${POSTGRES_PASSWORD_INPUT:-postgres}
-    read -p $'\033[32mPostgreSQL database (default is postgres, press Enter to use default): \033[0m' POSTGRES_DB_INPUT
+    read -p $'\033[32mPostgreSQL database (default is postgres, press Enter to use it): \033[0m' POSTGRES_DB_INPUT
     POSTGRES_DB=${POSTGRES_DB_INPUT:-postgres}
     read -p $'\033[32mTelegram Bot Token: \033[0m' TG_BOT_TOKEN
     read -p $'\033[32mTelegram Chat ID: \033[0m' TG_CHAT_ID
