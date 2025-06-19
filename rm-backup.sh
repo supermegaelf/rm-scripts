@@ -29,8 +29,8 @@ if [ -z "$TG_BOT_TOKEN" ] || [ -z "$TG_CHAT_ID" ]; then
     sed -i "s/TG_BOT_TOKEN=\"\"/TG_BOT_TOKEN=\"$TG_BOT_TOKEN\"/" "$0"
     sed -i "s/TG_CHAT_ID=\"\"/TG_CHAT_ID=\"$TG_CHAT_ID\"/" "$0"
 
-    if ! grep -q "/root/scripts/remnawave-tg-backup.sh" /etc/crontab; then
-        echo "0 */1 * * * root /bin/bash /root/scripts/remnawave-tg-backup.sh >/dev/null 2>&1" | tee -a /etc/crontab
+    if ! grep -q "/root/scripts/rm-backup.sh" /etc/crontab; then
+        echo "0 */1 * * * root /bin/bash /root/scripts/rm-backup.sh >/dev/null 2>&1" | tee -a /etc/crontab
     fi
 fi
 
