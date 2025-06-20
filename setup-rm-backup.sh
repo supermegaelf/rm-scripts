@@ -12,16 +12,16 @@ NC='\033[0m'
 
 # Remnawave backup setup script
 echo
-echo -e "${PURPLE}============================${NC}"
+echo -e "${PURPLE}=======================${NC}"
 echo -e "${NC}Remnawave Backup Setup${NC}"
-echo -e "${PURPLE}============================${NC}"
+echo -e "${PURPLE}=======================${NC}"
 echo
 
 set -e
 
-echo -e "${GREEN}===============================${NC}"
+echo -e "${GREEN}================================${NC}"
 echo -e "${NC}1. Preparing backup environment${NC}"
-echo -e "${GREEN}===============================${NC}"
+echo -e "${GREEN}================================${NC}"
 echo
 
 SCRIPT_URL="https://raw.githubusercontent.com/supermegaelf/rm-scripts/main/rm-backup.sh"
@@ -61,14 +61,14 @@ if [ $? -ne 0 ]; then
 fi
 
 echo
-echo -e "${GREEN}----------------------------------${NC}"
+echo -e "${GREEN}-----------------------------------------${NC}"
 echo -e "${NC}✓ Backup script downloaded successfully!${NC}"
-echo -e "${GREEN}----------------------------------${NC}"
+echo -e "${GREEN}-----------------------------------------${NC}"
 echo
 
-echo -e "${GREEN}============================${NC}"
+echo -e "${GREEN}=============================${NC}"
 echo -e "${NC}3. Configuring backup script${NC}"
-echo -e "${GREEN}============================${NC}"
+echo -e "${GREEN}=============================${NC}"
 echo
 
 echo -e "${CYAN}Running rm-backup.sh to configure variables...${NC}"
@@ -79,14 +79,14 @@ if [ $? -ne 0 ]; then
 fi
 
 echo
-echo -e "${GREEN}----------------------------------------${NC}"
+echo -e "${GREEN}-----------------------------------------------${NC}"
 echo -e "${NC}✓ Backup configuration completed successfully!${NC}"
-echo -e "${GREEN}----------------------------------------${NC}"
+echo -e "${GREEN}-----------------------------------------------${NC}"
 echo
 
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}==========================${NC}"
 echo -e "${NC}4. Verifying installation${NC}"
-echo -e "${GREEN}=========================${NC}"
+echo -e "${GREEN}==========================${NC}"
 echo
 
 echo -e "${CYAN}Verifying cron setup...${NC}"
@@ -107,9 +107,9 @@ else
 fi
 
 echo
-echo -e "${GREEN}--------------------------------------------${NC}"
+echo -e "${GREEN}--------------------------------${NC}"
 echo -e "${NC}✓ Setup completed successfully!${NC}"
-echo -e "${GREEN}--------------------------------------------${NC}"
+echo -e "${GREEN}--------------------------------${NC}"
 echo
 echo -e "${CYAN}Backup script location: ${WHITE}$SCRIPT_PATH${NC}"
 echo -e "${CYAN}Backup schedule: ${WHITE}Hourly execution${NC}"
