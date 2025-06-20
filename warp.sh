@@ -10,13 +10,62 @@ CYAN='\033[0;36m'
 WHITE='\033[1;37m'
 NC='\033[0m'
 
-# Check if script is run with uninstall flag
+# WireProxy WARP Management Script
+echo
+echo -e "${PURPLE}=============================${NC}"
+echo -e "${NC}WireProxy WARP Management${NC}"
+echo -e "${PURPLE}=============================${NC}"
+echo
+
+# Check if script is run with parameters
 if [ "$1" = "uninstall" ] || [ "$1" = "--uninstall" ] || [ "$1" = "-u" ]; then
+   ACTION="uninstall"
+elif [ "$1" = "install" ] || [ "$1" = "--install" ] || [ "$1" = "-i" ]; then
+   ACTION="install"
+else
+   # Interactive menu
+   echo -e "${CYAN}Please select an action:${NC}"
+   echo
+   echo -e "${GREEN}1.${NC} Install WireProxy WARP"
+   echo -e "${RED}2.${NC} Uninstall WireProxy WARP"
+   echo -e "${YELLOW}3.${NC} Exit"
+   echo
+   
+   while true; do
+       read -p "Enter your choice (1-3): " CHOICE
+       case $CHOICE in
+           1)
+               ACTION="install"
+               break
+               ;;
+           2)
+               ACTION="uninstall"
+               break
+               ;;
+           3)
+               echo -e "${CYAN}Goodbye!${NC}"
+               exit 0
+               ;;
+           *)
+               echo -e "${RED}Invalid choice. Please enter 1, 2, or 3.${NC}"
+               ;;
+       esac
+   done
+fi
+
+# Uninstall function
+if [ "$ACTION" = "uninstall" ]; then
    echo
    echo -e "${PURPLE}=============================${NC}"
    echo -e "${NC}WireProxy WARP Uninstaller${NC}"
    echo -e "${PURPLE}=============================${NC}"
    echo
+
+   # Check if WireProxy is installed
+   if [ ! -f "/usr/bin/wireproxy" ] && [ ! -f "/etc/systemd/system/wireproxy.service" ]; then
+       echo -e "${YELLOW}WireProxy WARP is not installed on this system.${NC}"
+       exit 0
+   fi
 
    # Confirmation
    echo -e "${YELLOW}This will completely remove WireProxy WARP setup.${NC}"
@@ -36,30 +85,56 @@ if [ "$1" = "uninstall" ] || [ "$1" = "--uninstall" ] || [ "$1" = "-u" ]; then
 
    # Stop and disable service
    echo "Stopping WireProxy service..."
-   systemctl stop wireproxy 2>/dev/null
-   systemctl disable wireproxy 2>/dev/null
+   systemctl stop wireproxy 2>/dev/null && echo "✓ Service stopped" || echo "ℹ Service was not running"
+   systemctl disable wireproxy 2>/dev/null && echo "✓ Service disabled" || echo "ℹ Service was not enabled"
 
    # Remove systemd service
    echo "Removing systemd service..."
-   rm -f /etc/systemd/system/wireproxy.service
-   systemctl daemon-reload
+   if [ -f "/etc/systemd/system/wireproxy.service" ]; then
+       rm -f /etc/systemd/system/wireproxy.service
+       systemctl daemon-reload
+       echo "✓ Systemd service removed"
+   else
+       echo "ℹ Systemd service file not found"
+   fi
 
    # Remove configuration files
    echo "Removing configuration files..."
-   rm -f /etc/wireguard/proxy.conf
-   rmdir /etc/wireguard 2>/dev/null || true
+   if [ -f "/etc/wireguard/proxy.conf" ]; then
+       rm -f /etc/wireguard/proxy.conf
+       echo "✓ Configuration file removed"
+   else
+       echo "ℹ Configuration file not found"
+   fi
+   
+   # Remove directory if empty
+   if [ -d "/etc/wireguard" ] && [ -z "$(ls -A /etc/wireguard)" ]; then
+       rmdir /etc/wireguard
+       echo "✓ Empty wireguard directory removed"
+   fi
 
    # Remove WireProxy binary
    echo "Removing WireProxy binary..."
-   rm -f /usr/bin/wireproxy
+   if [ -f "/usr/bin/wireproxy" ]; then
+       rm -f /usr/bin/wireproxy
+       echo "✓ WireProxy binary removed"
+   else
+       echo "ℹ WireProxy binary not found"
+   fi
 
    # Remove management script
    echo "Removing management script..."
-   rm -f /usr/bin/warp
+   if [ -f "/usr/bin/warp" ]; then
+       rm -f /usr/bin/warp
+       echo "✓ Management script removed"
+   else
+       echo "ℹ Management script not found"
+   fi
 
    # Remove temporary files
    echo "Cleaning up temporary files..."
    rm -f /tmp/warp-account.conf /tmp/wireproxy.tar.gz
+   echo "✓ Temporary files cleaned"
 
    echo
    echo -e "${GREEN}==========================================${NC}"
@@ -69,12 +144,27 @@ if [ "$1" = "uninstall" ] || [ "$1" = "--uninstall" ] || [ "$1" = "-u" ]; then
    exit 0
 fi
 
-# WireProxy WARP setup script
+# Installation process
 echo
 echo -e "${PURPLE}========================${NC}"
 echo -e "${NC}WireProxy WARP Setup${NC}"
 echo -e "${PURPLE}========================${NC}"
 echo
+
+# Check if already installed
+if [ -f "/usr/bin/wireproxy" ] && [ -f "/etc/systemd/system/wireproxy.service" ]; then
+   echo -e "${YELLOW}WireProxy WARP appears to be already installed.${NC}"
+   echo -e "${YELLOW}Do you want to reinstall? (y/N)${NC}"
+   read -r REINSTALL
+   
+   if [[ ! "$REINSTALL" =~ ^[Yy]$ ]]; then
+       echo -e "${CYAN}Installation cancelled.${NC}"
+       echo -e "${CYAN}Use 'warp status' to check current installation.${NC}"
+       exit 0
+   fi
+   
+   echo -e "${YELLOW}Proceeding with reinstallation...${NC}"
+fi
 
 set -e
 
