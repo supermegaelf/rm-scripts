@@ -12,9 +12,9 @@ NC='\033[0m'
 
 # WireProxy WARP Management Script
 echo
-echo -e "${PURPLE}=============================${NC}"
+echo -e "${PURPLE}==========================${NC}"
 echo -e "${NC}WireProxy WARP Management${NC}"
-echo -e "${PURPLE}=============================${NC}"
+echo -e "${PURPLE}==========================${NC}"
 echo
 
 # Check if script is run with parameters
@@ -56,9 +56,9 @@ fi
 # Uninstall function
 if [ "$ACTION" = "uninstall" ]; then
    echo
-   echo -e "${PURPLE}=============================${NC}"
+   echo -e "${PURPLE}===========================${NC}"
    echo -e "${NC}WireProxy WARP Uninstaller${NC}"
-   echo -e "${PURPLE}=============================${NC}"
+   echo -e "${PURPLE}===========================${NC}"
    echo
 
    # Check if WireProxy is installed
@@ -78,9 +78,9 @@ if [ "$ACTION" = "uninstall" ]; then
    fi
 
    echo
-   echo -e "${GREEN}================================${NC}"
+   echo -e "${GREEN}========================${NC}"
    echo -e "${NC}Removing WireProxy WARP${NC}"
-   echo -e "${GREEN}================================${NC}"
+   echo -e "${GREEN}========================${NC}"
    echo
 
    # Stop and disable service
@@ -137,18 +137,18 @@ if [ "$ACTION" = "uninstall" ]; then
    echo "✓ Temporary files cleaned"
 
    echo
-   echo -e "${GREEN}==========================================${NC}"
+   echo -e "${GREEN}===========================================${NC}"
    echo -e "${NC}✓ WireProxy WARP uninstalled successfully!${NC}"
-   echo -e "${GREEN}==========================================${NC}"
+   echo -e "${GREEN}===========================================${NC}"
    echo
    exit 0
 fi
 
 # Installation process
 echo
-echo -e "${PURPLE}========================${NC}"
+echo -e "${PURPLE}=====================${NC}"
 echo -e "${NC}WireProxy WARP Setup${NC}"
-echo -e "${PURPLE}========================${NC}"
+echo -e "${PURPLE}=====================${NC}"
 echo
 
 # Check if already installed
@@ -168,9 +168,9 @@ fi
 
 set -e
 
-echo -e "${GREEN}========================${NC}"
+echo -e "${GREEN}======================${NC}"
 echo -e "${NC}1. System preparation${NC}"
-echo -e "${GREEN}========================${NC}"
+echo -e "${GREEN}======================${NC}"
 echo
 
 # Update package list and install basic packages
@@ -179,14 +179,14 @@ apt-get update -y
 apt-get install -y curl wget net-tools iproute2 iptables jq tar
 
 echo
-echo -e "${GREEN}-----------------------------------${NC}"
+echo -e "${GREEN}--------------------------------${NC}"
 echo -e "${NC}✓ System preparation completed!${NC}"
-echo -e "${GREEN}-----------------------------------${NC}"
+echo -e "${GREEN}--------------------------------${NC}"
 echo
 
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}=========================${NC}"
 echo -e "${NC}2. Creating WARP account${NC}"
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}=========================${NC}"
 echo
 
 # Create directory structure
@@ -206,14 +206,14 @@ fi
 echo "WARP account registered successfully!"
 
 echo
-echo -e "${GREEN}--------------------------------------${NC}"
+echo -e "${GREEN}-----------------------------------${NC}"
 echo -e "${NC}✓ WARP account creation completed!${NC}"
-echo -e "${GREEN}--------------------------------------${NC}"
+echo -e "${GREEN}-----------------------------------${NC}"
 echo
 
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}========================${NC}"
 echo -e "${NC}3. Installing WireProxy${NC}"
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}========================${NC}"
 echo
 
 # Determine architecture
@@ -246,14 +246,14 @@ chmod +x /usr/bin/wireproxy
 rm -f /tmp/wireproxy.tar.gz
 
 echo
-echo -e "${GREEN}-----------------------------------${NC}"
+echo -e "${GREEN}------------------------------------${NC}"
 echo -e "${NC}✓ WireProxy installation completed!${NC}"
-echo -e "${GREEN}-----------------------------------${NC}"
+echo -e "${GREEN}------------------------------------${NC}"
 echo
 
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}==========================${NC}"
 echo -e "${NC}4. Creating configuration${NC}"
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}==========================${NC}"
 echo
 
 # Extract data from WARP account
@@ -289,14 +289,14 @@ BindAddress = 127.0.0.1:40000
 EOF
 
 echo
-echo -e "${GREEN}--------------------------------------${NC}"
+echo -e "${GREEN}------------------------------------${NC}"
 echo -e "${NC}✓ Configuration creation completed!${NC}"
-echo -e "${GREEN}--------------------------------------${NC}"
+echo -e "${GREEN}------------------------------------${NC}"
 echo
 
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}=========================${NC}"
 echo -e "${NC}5. Testing configuration${NC}"
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}=========================${NC}"
 echo
 
 # Test configuration
@@ -315,14 +315,14 @@ else
 fi
 
 echo
-echo -e "${GREEN}----------------------------------${NC}"
+echo -e "${GREEN}-----------------------------------${NC}"
 echo -e "${NC}✓ Configuration testing completed!${NC}"
-echo -e "${GREEN}----------------------------------${NC}"
+echo -e "${GREEN}-----------------------------------${NC}"
 echo
 
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}============================${NC}"
 echo -e "${NC}6. Creating systemd service${NC}"
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}============================${NC}"
 echo
 
 # Create systemd service
@@ -353,14 +353,14 @@ systemctl enable wireproxy
 sleep 3
 
 echo
-echo -e "${GREEN}------------------------------------${NC}"
+echo -e "${GREEN}--------------------------------------${NC}"
 echo -e "${NC}✓ Systemd service creation completed!${NC}"
-echo -e "${GREEN}------------------------------------${NC}"
+echo -e "${GREEN}--------------------------------------${NC}"
 echo
 
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}==============================${NC}"
 echo -e "${NC}7. Creating management script${NC}"
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}==============================${NC}"
 echo
 
 # Create management script
@@ -475,14 +475,14 @@ EOF
 chmod +x /usr/bin/warp
 
 echo
-echo -e "${GREEN}--------------------------------------${NC}"
+echo -e "${GREEN}----------------------------------------${NC}"
 echo -e "${NC}✓ Management script creation completed!${NC}"
-echo -e "${GREEN}--------------------------------------${NC}"
+echo -e "${GREEN}----------------------------------------${NC}"
 echo
 
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}======================${NC}"
 echo -e "${NC}8. Final verification${NC}"
-echo -e "${GREEN}================================${NC}"
+echo -e "${GREEN}======================${NC}"
 echo
 
 # Final verification
@@ -518,14 +518,14 @@ fi
 rm -f /tmp/warp-account.conf
 
 echo
-echo -e "${GREEN}--------------------------------------${NC}"
+echo -e "${GREEN}--------------------------------${NC}"
 echo -e "${NC}✓ Final verification completed!${NC}"
-echo -e "${GREEN}--------------------------------------${NC}"
+echo -e "${GREEN}--------------------------------${NC}"
 echo
 
-echo -e "${GREEN}==========================================${NC}"
+echo -e "${GREEN}===============================================${NC}"
 echo -e "${NC}✓ WireProxy WARP setup completed successfully!${NC}"
-echo -e "${GREEN}==========================================${NC}"
+echo -e "${GREEN}===============================================${NC}"
 echo
 echo -e "${CYAN}SOCKS5 Proxy Information:${NC}"
 echo -e "Address: ${WHITE}127.0.0.1:40000${NC}"
